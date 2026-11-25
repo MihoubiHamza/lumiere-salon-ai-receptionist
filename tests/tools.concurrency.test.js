@@ -375,18 +375,21 @@ test('R7 another patient cannot reschedule or cancel someone else\'s appointment
     () => H.callConfirmed(env, 'cancel', { appointment_date: DAY, appointment_time: '10:00', phone_number: '213666000009', patient_name: '', booked_phone_number: '' }),
     () => H.callConfirmed(env, 'cancel', { appointment_date: DAY, appointment_time: '10:00', phone_number: '213666000009', patient_name: 'Sara Benali', booked_phone_number: '' }),
   ]);
-  assert.deepStrictEqual(rs.map(status), ['NOT_FOUND', 'NOT_FOUND', 'NEED_BOOKED_PHONE']);
+  assert.deepStrictEqual(rs.map(status), ['NOT_FOUND', 'NOT_FOUND', 'NOT_FOUND']);
+  for (const r of rs) assert.ok(r.result.indexOf('Sara') < 0, 'no details of the other customer: ' + r.result);
   assert.strictEqual(apptTime(env, 'apptone1'), DAY + 'T10:00');
 });
 
-test('R8 different booking number: works with booked_phone_number, never with a bare name', async () => {
+test('R8 a different booking number or a bare name never gives access (staff only, nothing revealed)', async () => {
   const env = makeEnv({ seed: 40 });
   seedAppt(env, 'apptone1', '213555000001', DAY, '10:00', 'Sara Benali - x');
   const [byName] = await runAll(env, [() => H.callConfirmed(env, 'reschedule', rs_('213777000000', DAY, '10:00', DAY, '15:00', { patient_name: 'Sara Benali' }))]);
-  assert.strictEqual(status(byName), 'NEED_BOOKED_PHONE', byName.result);
+  assert.strictEqual(status(byName), 'NOT_FOUND', byName.result);
+  // Before 2026-11-25 this typed number moved Sara's appointment. Now it is refused before any calendar read.
   const [byPhone] = await runAll(env, [() => H.callConfirmed(env, 'reschedule', rs_('213777000000', DAY, '10:00', DAY, '15:00', { booked_phone_number: '0555000001' }))]);
-  assert.strictEqual(status(byPhone), 'SUCCESS', byPhone.result);
-  assert.strictEqual(apptTime(env, 'apptone1'), DAY + 'T15:00');
+  assert.strictEqual(status(byPhone), 'NEED_STAFF', byPhone.result);
+  for (const r of [byName, byPhone]) assert.ok(r.result.indexOf('Sara') < 0 && !byPhone.proposal, 'nothing revealed or proposed: ' + r.result);
+  assert.strictEqual(apptTime(env, 'apptone1'), DAY + 'T10:00');
 });
 
 // ============================================================ CANCEL
@@ -446,7 +449,7 @@ test('C5 cancel then immediately rebook the freed slot (another patient) works',
 });
 
 // ============================================================ READ-ONLY TOOLS
-test('F1 Find: own appointments only; bare name refused; booked number works', async () => {
+test('F1 Find: own appointments only; bare name and typed booking number refused, nothing revealed', async () => {
   const env = makeEnv({ seed: 49 });
   seedAppt(env, 'apptone1', '213555000001', DAY, '10:00', 'Sara Benali - x');
   seedAppt(env, 'appttwo2', '213555000002', DAY, '11:00', 'Amine Kaci - y');
@@ -456,8 +459,8 @@ test('F1 Find: own appointments only; bare name refused; booked number works', a
     () => callTool(env, 'find', { phone_number: '213999999999', patient_name: '', appointment_date: '', booked_phone_number: '0555000002' }),
   ]);
   assert.ok(/^FOUND: 1\) Sara Benali/.test(rs[0].result) && rs[0].result.indexOf('Amine') < 0, rs[0].result);
-  assert.ok(/^NOT_FOUND/.test(rs[1].result) && /booked_phone_number/.test(rs[1].result) && rs[1].result.indexOf('Amine') < 0, rs[1].result);
-  assert.ok(/^FOUND: 1\) Amine Kaci/.test(rs[2].result), rs[2].result);
+  assert.ok(/^NOT_FOUND/.test(rs[1].result) && /Escalate_to_Staff/.test(rs[1].result) && rs[1].result.indexOf('Amine') < 0, rs[1].result);
+  assert.ok(/^NEED_STAFF/.test(rs[2].result) && rs[2].result.indexOf('Amine') < 0 && rs[2].result.indexOf('11:00') < 0, 'a typed number never finds another customer: ' + rs[2].result);
 });
 
 test('F2 Check_Availability never leaks other customers\' names; knows past times, Sunday closing and service length', async () => {

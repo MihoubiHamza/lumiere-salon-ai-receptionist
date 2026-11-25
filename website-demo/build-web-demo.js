@@ -519,6 +519,7 @@ function demoToolNode(wf, key) {
   setToolInput(t, 'demo_config', CFG_INPUT);
   const v = t.parameters.workflowInputs.value;
   if ('booked_phone_number' in v) v.booked_phone_number = ''; // a demo session can only manage its own bookings
+  if ('customer_key' in v) v.customer_key = ''; // the demo session pseudo-ID (phone_number) stays the identity
   return t;
 }
 function patchTools(wf) {
@@ -534,20 +535,20 @@ function patchTools(wf) {
 
   const find = demoToolNode(wf, 'find');
   find.parameters.description = replaceOnce(find.parameters.description,
-    'By default this searches automatically using the current WhatsApp number - leave booked_phone_number and appointment_date empty for a normal search. Only fill in booked_phone_number (and appointment_date if known) when the customer has explicitly said this appointment was booked from a different phone number than the one they are texting from right now - a customer name alone is never accepted.',
+    'By default this searches automatically using the current WhatsApp number - ' + REAL.FIND_OWN_TEXT,
     'It searches automatically for the appointments booked in this chat session - leave appointment_date empty for a normal search.', 'find description');
   find.parameters.workflowInputs.value.appointment_date = "={{ $fromAI('appointment_date', 'Optional. A specific date to narrow the search, format YYYY-MM-DD. Leave empty normally.', 'string', '') }}";
   find.parameters.workflowInputs.value.patient_name = '';
 
   const cancel = demoToolNode(wf, 'cancel');
   cancel.parameters.description = replaceOnce(cancel.parameters.description,
-    'The current WhatsApp number is detected and used automatically for a normal cancellation. If the appointment was booked from a different phone number than the one texting now, pass that exact number as booked_phone_number (leave it empty otherwise) - a customer name alone is never accepted (NEED_BOOKED_PHONE).',
+    'The current WhatsApp number is detected and used automatically for a normal cancellation. ' + REAL.CHANGE_OWN_TEXT,
     'This chat session is detected and used automatically.', 'cancel description');
   cancel.parameters.workflowInputs.value.patient_name = '';
 
   const res = demoToolNode(wf, 'reschedule');
   res.parameters.description = replaceOnce(res.parameters.description,
-    'Phone number detected automatically. If the appointment was booked from a different phone number than the one texting now, pass that exact number as booked_phone_number (leave it empty otherwise) - a customer name alone is never accepted (NEED_BOOKED_PHONE).',
+    'Phone number detected automatically. ' + REAL.CHANGE_OWN_TEXT,
     'This chat session is detected automatically.', 'reschedule description');
   const rv = res.parameters.workflowInputs.value;
   rv.new_summary = ''; rv.new_description = ''; rv.patient_name = '';
@@ -635,7 +636,7 @@ function buildMain() {
     const n = must(wf, node); const W = WF[key];
     n.parameters.workflowId = { __rl: true, value: W.id, mode: 'list', cachedResultUrl: '/workflow/' + W.id, cachedResultName: W.name };
     const wi = n.parameters.workflowInputs;
-    wi.value.demo_config = CFG_INPUT; wi.value.booked_phone_number = '';
+    wi.value.demo_config = CFG_INPUT; wi.value.booked_phone_number = ''; wi.value.customer_key = '';
     if (!wi.schema.some((f) => f.id === 'demo_config')) wi.schema.push(Object.assign({}, wi.schema[0], { id: 'demo_config', displayName: 'demo_config' }));
   }
   // The website chat is typed text only (no voice path, no "Merge Voice Text" node).
@@ -668,7 +669,7 @@ function demoTrigger(wf, extra) {
   for (const n of ['demo_config'].concat(extra || [])) if (!vals.some((v) => v.name === n)) vals.push({ name: n });
 }
 function startCode(op, from, extra) {
-  return BANNER + "const t = Object.assign({}, $('" + from + "').first().json);\ndelete t.demo_config; delete t.demoConfig;\nt.booked_phone_number = '';\n" + (extra || '') +
+  return BANNER + "const t = Object.assign({}, $('" + from + "').first().json);\ndelete t.demo_config; delete t.demoConfig;\nt.booked_phone_number = '';\nt.customer_key = ''; // demo sessions: the pseudo-ID in phone_number is the identity\n" + (extra || '') +
     "return [{ json: { __engineStart: { op: '" + op + "', ctx: t } } }];\n";
 }
 const BOOK_GUARD_CODE = `// Demo rules for every booking: the title is always "DEMO - <name>" and the

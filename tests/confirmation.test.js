@@ -294,19 +294,49 @@ test('V2 WhatsApp: a voice note saying "Sí" is not accepted; the customer is as
   assert.strictEqual(ex.inputs.confirm_via, 'text');
 });
 
-test('P2 the 5 salon tools can only be called by the salon WhatsApp and Messenger workflows', () => {
+test('K12 channel keys: an Instagram confirmation lives in that customer\'s own lock object; the same digits on Messenger, another account or WhatsApp can never use it', async () => {
+  const env = makeEnv({ seed: 591 });
+  const IGK = 'ig:17841400000000001:5512345678901234';
+  const s = Date.parse(DAY + 'T10:00:00+01:00');
+  env.cal.seed(CAL, { id: 'igappt01', summary: 'Lina - Manicure', description: 'Customer: ' + IGK + '. Notes: Instagram - Tel: +34600000009', start: { dateTime: DAY + 'T10:00:00+01:00', timeZone: 'Africa/Algiers' }, end: { dateTime: new Date(s + 30 * 60000 + 3600000).toISOString().slice(0, 19) + '+01:00', timeZone: 'Africa/Algiers' } });
+  const ik = (key) => cn('', '10:00', { customer_key: key });
+  const m = await propose(env, 'cancel', ik(IGK));
+  for (const other of ['fb:17841400000000001:5512345678901234', 'ig:17841499999999999:5512345678901234']) {
+    const r = await execute(env, 'cancel', ik(other), m);
+    assert.strictEqual(status(r), 'CONFIRMATION_INVALID', other + ': ' + r.result);
+  }
+  const wa = await execute(env, 'cancel', cn('5512345678901234', '10:00'), m);
+  assert.strictEqual(status(wa), 'CONFIRMATION_INVALID', wa.result);
+  assert.strictEqual(apptTime(env, 'igappt01'), DAY + 'T10:00');
+  // Another channel cannot even propose it (it does not own the appointment).
+  const p = await one(env, () => callTool(env, 'cancel', ik('fb:17841400000000001:5512345678901234')));
+  assert.ok(!/^CONFIRMATION_REQUIRED/.test(p.result), p.result);
+  const own = await execute(env, 'cancel', ik(IGK), m);
+  assert.ok(/^SUCCESS/.test(own.result), own.result);
+});
+
+test('K13 migration: a WhatsApp confirmation proposed before customer keys (phone_number only) is confirmed by the new wa: caller (same lock object)', async () => {
+  const env = makeEnv({ seed: 592 });
+  seedAppt(env, 'apptone1', A, DAY, '10:00', 'Sara - Manicure');
+  const m = await propose(env, 'cancel', cn(A, '10:00')); // legacy caller
+  const r = await execute(env, 'cancel', cn(A, '10:00', { customer_key: 'wa:' + A }), m); // upgraded caller
+  assert.ok(/^SUCCESS/.test(r.result), r.result);
+  assert.strictEqual(apptTime(env, 'apptone1'), 'cancelled');
+});
+
+test('P2 the 5 salon tools can only be called by the salon WhatsApp, Messenger and Instagram workflows', () => {
   const fs = require('fs'), path = require('path');
   const ENV = require(path.join(H.ROOT, 'lumiere.config.js'));
   for (const k of ['book', 'cancel', 'reschedule', 'find', 'check']) {
     const w = JSON.parse(fs.readFileSync(path.join(H.ROOT, H.FILES[k]), 'utf8'));
-    assert.deepStrictEqual([w.settings.callerPolicy, w.settings.callerIds], ['workflowsFromAList', ENV.workflows.main + ',' + ENV.workflows.messenger], k);
+    assert.deepStrictEqual([w.settings.callerPolicy, w.settings.callerIds], ['workflowsFromAList', [ENV.workflows.main, ENV.workflows.messenger, ENV.workflows.instagram].join(',')], k);
     assert.deepStrictEqual(w.nodes.filter((n) => /trigger|webhook|schedule/i.test(n.type)).map((n) => n.type), ['n8n-nodes-base.executeWorkflowTrigger'], k + ' triggers');
   }
 });
 
-test('P1 every main workflow (WhatsApp, Messenger, website) tells the AI that the system does the confirmation', () => {
+test('P1 every main workflow (WhatsApp, Messenger, Instagram, website) tells the AI that the system does the confirmation', () => {
   const fs = require('fs'), path = require('path');
-  for (const f of [H.FILES.main, 'Lumiere Messenger AI Agent.json', path.join('website-demo', 'Lumiere Salon - Website Demo.json')]) {
+  for (const f of [H.FILES.main, 'Lumiere Messenger AI Agent.json', 'Lumiere Instagram AI Agent.json', path.join('website-demo', 'Lumiere Salon - Website Demo.json')]) {
     const w = JSON.parse(fs.readFileSync(path.join(H.ROOT, f), 'utf8'));
     const sys = w.nodes.find((n) => n.name === 'AI Agent').parameters.options.systemMessage;
     assert.ok(sys.indexOf('## CONFIRMATION OF CANCELLATIONS AND RESCHEDULES IS DONE BY THE SYSTEM') >= 0 && sys.indexOf('IN THIS SAME TURN') >= 0, f + ' lacks the confirmation section');

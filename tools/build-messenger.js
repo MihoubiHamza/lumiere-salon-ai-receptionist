@@ -13,13 +13,15 @@
 // chat-lock engine, Sanitize AI Output, the escalation/pause logic.
 // What is Messenger-specific: intake (webhook + signature check), identity
 // (the sender's Page-Scoped ID instead of a phone number), sending replies,
-// voice download, pause rows ("fb:<PSID>"), staff alert texts, prompt wording.
+// voice download, customer key and pause rows ("fb:<page_id>:<PSID>"), staff
+// alert texts, prompt wording.
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
 const ROOT = path.resolve(__dirname, '..');
 const WA_FILE = require('./build-workflows.js').FILES.main;
+const { KEY_TOOLS, CUSTOMER_KEY_EXPR } = require('./build-workflows.js');
 const ENV = require(path.join(ROOT, 'lumiere.config.js'));
 const OUT_FILE = 'Lumiere Messenger AI Agent.json';
 const NAME = 'Lumière Messenger AI Agent';
@@ -206,9 +208,11 @@ return out;
 `;
 
 const DEDUP_CODE = `// Messenger intake: same output shape as the WhatsApp version so every later
-// node works unchanged. chatId is the sender's Page-Scoped ID (PSID) - the
-// verified identity on Messenger, used exactly like the WhatsApp number (chat
-// lock, memory, appointment owner). Staff alerts still go to staff on WhatsApp:
+// node works unchanged. chatId is the sender's Page-Scoped ID (PSID), used to
+// reply. customerKey = "fb:<page_id>:<psid>" is the verified, channel-aware
+// customer identity (chat lock, confirmations, memory, pause row, appointment
+// owner): it can never equal a WhatsApp number, an Instagram user or the same
+// PSID on another Page. Staff alerts still go to staff on WhatsApp:
 //   LUMIERE_WHATSAPP_PHONE_NUMBER_ID, LUMIERE_WHATSAPP_ACCESS_TOKEN, LUMIERE_STAFF_CHAT_ID
 const CONFIG = {
   phoneNumberId: $env.LUMIERE_WHATSAPP_PHONE_NUMBER_ID || '',
@@ -222,6 +226,10 @@ const ev = ($input.first().json || {}).event || null;
 if (!ev || !ev.sender || !ev.sender.id) return [];
 const psid = String(ev.sender.id).replace(/\\D/g, '');
 if (!psid) return [];
+// The Page that received the message (entry.id). Without it there is no customer key: drop.
+const pageId = String(($input.first().json || {}).pageId || '');
+if (!/^\\d{5,25}$/.test(pageId) || !/^\\d{5,25}$/.test(psid)) return [];
+const customerKey = 'fb:' + pageId + ':' + psid;
 const msg = ev.message || null;
 const postback = ev.postback || null;
 if (!msg && !postback) return [];
@@ -289,6 +297,8 @@ return [{
     unmuteTargetPhone: '',
     chatId: psid,
     psid,
+    pageId,
+    customerKey,
     senderName: '',
     messageType,
     textBody,
@@ -301,19 +311,23 @@ return [{
 }];
 `;
 
-const MATCH_PAUSE_CODE = `// Messenger pause rows are written as "fb:<PSID>" (text). A bare 16-17 digit
-// PSID would be stored by Google Sheets as a rounded number and never match
-// again. The prefix also keeps Messenger rows from ever matching a WhatsApp
-// number (and vice versa). Staff re-enable the bot by setting Status to
-// anything other than "paused" (e.g. "unmuted") or deleting the row.
+const MATCH_PAUSE_CODE = `// Messenger pause rows are written as the customer key "fb:<page_id>:<PSID>"
+// (text). A bare 16-17 digit PSID would be stored by Google Sheets as a rounded
+// number and never match again. The prefix also keeps Messenger rows from ever
+// matching a WhatsApp number or an Instagram customer (and vice versa).
+// Rows written before customer keys existed ("fb:<PSID>", same salon Page) still
+// pause the customer: a pause is never lost by the upgrade.
+// Staff re-enable the bot by setting Status to anything other than "paused"
+// (e.g. "unmuted") or deleting the row.
 // The Sheets read failed: its error branch answers and releases the lock - never continue here too
 // (Check Handoff Status has "Always Output Data", so n8n also sends an empty item here; see build-workflows.js).
 if ($('Check Handoff Status').all(1).length) return [];
-const key = 'fb:' + $('Dedup & Filter Prep').first().json.chatId;
+const d = $('Dedup & Filter Prep').first().json;
+const keys = [d.customerKey, 'fb:' + d.chatId];
 let isPaused = false;
 
 for (const row of $input.all()) {
-  if (String(row.json.Patient_ID || '').trim() === key && String(row.json.Status || '').trim() === 'paused') {
+  if (keys.indexOf(String(row.json.Patient_ID || '').trim()) >= 0 && String(row.json.Status || '').trim() === 'paused') {
     isPaused = true;
     break;
   }
@@ -358,7 +372,7 @@ const MESSENGER_RULES = `
 - You are chatting with the customer through the salon's Facebook Page on Messenger. Messenger does NOT reveal the customer's phone number.
 - WHO OWNS AN APPOINTMENT: every appointment you book here is automatically linked to THIS Messenger conversation by the system - you never pass, mention or ask for any ID. Find_Patient_Appointments, Cancel_Appointment and Reschedule_Appointment automatically find the appointments booked from this same Messenger conversation. Wherever the rules below or a tool result say "the current WhatsApp number", "this WhatsApp number" or "the number you are texting from", read it as "this Messenger conversation".
 - CONTACT MOBILE NUMBER IS REQUIRED FOR EVERY MESSENGER BOOKING: before calling Book_Appointment you must also have the customer's mobile number, stated by the customer in this conversation (a real mobile number: 9 to 15 digits, ideally with the country code). Ask for it together with the other missing details, and only once - if they already gave it, never ask again. Put it in the notes exactly as the Book_Appointment notes field describes. The salon uses it to contact the customer.
-- APPOINTMENTS BOOKED ELSEWHERE: appointments booked on WhatsApp, by phone call, at the salon, or from another Facebook account are NOT found automatically here. If the customer says so, ask for the exact phone number the appointment was booked with and follow the "booked from a DIFFERENT phone number" procedure below (booked_phone_number). If nothing is found, call Escalate_to_Staff.
+- APPOINTMENTS BOOKED ELSEWHERE: appointments booked on WhatsApp, by phone call, at the salon, from another Facebook account or by someone else can NEVER be found, shown or changed from here, and a phone number or name the customer types is never proof that an appointment is theirs. Never ask for that number and never search for it. Tell the customer plainly that you can only manage the appointments booked from this conversation (they can also manage it from where it was booked), and call Escalate_to_Staff so a team member can help.
 - Messenger shows plain text only: never use markdown such as *bold*, _italic_ or # headings.`;
 
 function patchPrompt(p) {
@@ -466,8 +480,8 @@ function build() {
   san.parameters.jsCode = replaceOnce(san.parameters.jsCode, '    forcePause,\n  }\n}];', '    forcePause,\n    replyPart1,\n    replyPart2,\n  }\n}];', 'sanitize fields');
 
   // ---- staff alerts stay on WhatsApp (same staff number and credential)
-  must(wf, 'Alert Staff - System Error').parameters.textBody = "={{ '⚠️ [Messenger] Technical problem - the bot could not reply to a customer on Facebook Messenger' + (" + PROFILE_NAME + " ? ' (' + " + PROFILE_NAME + " + ')' : '') + '. Their message: ' + (" + D + ".textBody || '(voice message)') + '. Messenger customer fb:' + " + D + ".chatId + ' - please reply manually from the Facebook Page inbox.' }}";
-  must(wf, 'Alert Staff - Pause Failed').parameters.textBody = "={{ '⚠️ [Messenger] Could not pause the bot for Messenger customer' + (" + PROFILE_NAME + " ? ' ' + " + PROFILE_NAME + " : '') + ' (fb:' + " + D + ".chatId + ') after escalation - please reply manually from the Facebook Page inbox and check the Active_Handoffs sheet.' }}";
+  must(wf, 'Alert Staff - System Error').parameters.textBody = "={{ '⚠️ [Messenger] Technical problem - the bot could not reply to a customer on Facebook Messenger' + (" + PROFILE_NAME + " ? ' (' + " + PROFILE_NAME + " + ')' : '') + '. Their message: ' + (" + D + ".textBody || '(voice message)') + '. Messenger customer ' + " + D + ".customerKey + ' - please reply manually from the Facebook Page inbox.' }}";
+  must(wf, 'Alert Staff - Pause Failed').parameters.textBody = "={{ '⚠️ [Messenger] Could not pause the bot for Messenger customer' + (" + PROFILE_NAME + " ? ' ' + " + PROFILE_NAME + " : '') + ' (' + " + D + ".customerKey + ') after escalation - please reply manually from the Facebook Page inbox and check the Active_Handoffs sheet.' }}";
 
   const esc = must(wf, 'Escalate to Staff');
   esc.parameters.toolDescription = replaceOnce(esc.parameters.toolDescription,
@@ -478,13 +492,19 @@ function build() {
     "'⚠️ ' + ($fromAI(", "'⚠️ [Messenger] ' + ($fromAI(", 'escalate prefix');
   esc.parameters.jsonBody = replaceOnce(esc.parameters.jsonBody,
     "'\\n\\nCustomer: ' + " + D + ".chatId + '\\n\\nTo re-enable the bot: !unmute ' + " + D + ".chatId",
-    "'\\n\\nCustomer (Facebook Messenger): ' + (" + PROFILE_NAME + " || 'name unknown') + ' - fb:' + " + D + ".chatId + '\\nLast message: ' + String(" + D + ".textBody || '(voice message)').slice(0, 300) + '\\n\\nReply from the Facebook Page inbox (Meta Business Suite).\\nTo re-enable the bot: Active_Handoffs sheet, row fb:' + " + D + ".chatId + ' -> Status = unmuted'", 'escalate body');
+    "'\\n\\nCustomer (Facebook Messenger): ' + (" + PROFILE_NAME + " || 'name unknown') + ' - ' + " + D + ".customerKey + '\\nLast message: ' + String(" + D + ".textBody || '(voice message)').slice(0, 300) + '\\n\\nReply from the Facebook Page inbox (Meta Business Suite).\\nTo re-enable the bot: Active_Handoffs sheet, row ' + " + D + ".customerKey + ' -> Status = unmuted'", 'escalate body');
 
-  // ---- pause / log / memory keyed by the PSID
-  must(wf, 'Write Pause Row').parameters.columns.value.Patient_ID = "={{ 'fb:' + " + D + ".chatId }}";
+  // ---- pause / log / memory keyed by the customer key fb:<page_id>:<PSID>
+  must(wf, 'Write Pause Row').parameters.columns.value.Patient_ID = "={{ " + D + ".customerKey }}";
   const log = must(wf, 'Log Conversation').parameters.columns.value;
-  log.Phone = "={{ 'fb:' + " + D + ".chatId + (" + PROFILE_NAME + " ? ' (' + " + PROFILE_NAME + " + ')' : '') }}";
-  must(wf, 'Simple Memory').parameters.sessionKey = replaceOnce(must(wf, 'Simple Memory').parameters.sessionKey, "={{ $('Dedup", "=fb_{{ $('Dedup", 'memory key');
+  log.Phone = "={{ " + D + ".customerKey + (" + PROFILE_NAME + " ? ' (' + " + PROFILE_NAME + " + ')' : '') }}";
+  must(wf, 'Simple Memory').parameters.sessionKey = replaceOnce(must(wf, 'Simple Memory').parameters.sessionKey, '.first().json.chatId }}', '.first().json.customerKey }}', 'memory key');
+  // ---- tools: the customer is the key only (Messenger reveals no phone number)
+  for (const t of KEY_TOOLS.concat(['Run Confirmed Cancel', 'Run Confirmed Reschedule'])) {
+    const v = must(wf, t).parameters.workflowInputs.value;
+    if (v.customer_key !== CUSTOMER_KEY_EXPR) throw new Error('build-messenger: ' + t + ' has no server-set customer_key');
+    v.phone_number = '';
+  }
 
   // ---- AI Agent input, prompt and tool wording
   const agent = must(wf, 'AI Agent');
@@ -499,19 +519,19 @@ function build() {
   const find = must(wf, 'Find_Patient_Appointments');
   find.parameters.description = replaceOnce(find.parameters.description, 'By default this searches automatically using the current WhatsApp number',
     'By default this searches automatically for appointments booked from this Messenger conversation', 'find description');
-  find.parameters.description = replaceOnce(find.parameters.description, 'booked from a different phone number than the one they are texting from right now',
-    'booked on WhatsApp, by phone, or from another account - i.e. not from this Messenger conversation', 'find description 2');
+  find.parameters.description = replaceOnce(find.parameters.description, 'If the customer says an appointment was booked from a different phone number, on another channel or by someone else,',
+    'If the customer says an appointment was booked on WhatsApp, by phone, from another account or by someone else (not from this Messenger conversation),', 'find description 2');
   const cancel = must(wf, 'Cancel_Appointment');
   cancel.parameters.description = replaceOnce(cancel.parameters.description, 'The current WhatsApp number is detected and used automatically for a normal cancellation.',
     'This Messenger conversation is detected and used automatically for a normal cancellation.', 'cancel description');
+  // booked_phone_number is fixed empty on every AI tool (a typed number is never proof of ownership).
   for (const t of ['Find_Patient_Appointments', 'Cancel_Appointment', 'Reschedule_Appointment']) {
-    const v = must(wf, t).parameters.workflowInputs.value;
-    v.booked_phone_number = replaceOnce(v.booked_phone_number, 'than the one they are texting from now', '(e.g. it was booked on WhatsApp or by phone, not from this Messenger conversation)', t + ' booked phone');
+    if (must(wf, t).parameters.workflowInputs.value.booked_phone_number !== '') throw new Error('build-messenger: ' + t + ' lets the AI set booked_phone_number');
   }
   for (const t of ['Cancel_Appointment', 'Reschedule_Appointment']) {
     const d = must(wf, t).parameters;
-    d.description = replaceOnce(d.description, 'If the appointment was booked from a different phone number than the one texting now,',
-      'If the appointment was not booked from this Messenger conversation (WhatsApp, phone call, another account),', t + ' description');
+    d.description = replaceOnce(d.description, 'If the customer says the appointment was booked from a different phone number, on another channel or by someone else,',
+      'If the customer says the appointment was not booked from this Messenger conversation (WhatsApp, phone call, another account, someone else),', t + ' description');
   }
   must(wf, 'Reschedule_Appointment').parameters.description = replaceOnce(must(wf, 'Reschedule_Appointment').parameters.description,
     'Phone number detected automatically.', 'This Messenger conversation is detected automatically.', 'reschedule phone');
@@ -551,4 +571,6 @@ if (require.main === module) {
     if (prev !== next) process.exit(1);
   } else if (prev !== next) { fs.writeFileSync(file, next); console.log('updated: ' + OUT_FILE); } else console.log('messenger workflow up to date');
 }
-module.exports = { build, OUT_FILE, NAME, WF_ID, WEBHOOK_PATH, WA_FILE, MESSENGER_MAX_CHARS };
+// The Instagram build (tools/build-instagram.js) derives from this one and reuses these pieces.
+module.exports = { build, OUT_FILE, NAME, WF_ID, WEBHOOK_PATH, WA_FILE, MESSENGER_MAX_CHARS, GRAPH, D, PROFILE_NAME, VERIFY_CODE, SPLIT_SNIPPET, MESSENGER_RULES,
+  helpers: { uuid, load, dump, byName, must, replaceOnce, walkStrings, remove, rename, conn, put, boolIf } };

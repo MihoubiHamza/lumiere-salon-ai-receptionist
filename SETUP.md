@@ -13,7 +13,7 @@ Nothing in this project contacts Google, Meta or n8n. You do every step below yo
 | n8n credentials | their credentials | own `LUMIERE - …` WhatsApp/Messenger credentials; Google, OpenRouter and Cohere shared on purpose (`SHARED_CREDENTIALS`) | `lumiere.config.js` |
 | WhatsApp number, token, staff number | `CLINIC_*` env vars | `LUMIERE_*` env vars | n8n environment (`lumiere.env.example`) |
 | Workflow IDs | clinic IDs, `othWebDemo…` | `lum…`, `lumWebDemo…` | `lumiere.config.js` |
-| Webhook paths | `other-bot-messenger`, `other-website-demo` | `lumiere-messenger`, `lumiere-website-demo` | `lumiere.config.js` |
+| Webhook paths | `other-bot-messenger`, `other-website-demo` | `lumiere-messenger`, `lumiere-instagram`, `lumiere-website-demo` | `lumiere.config.js` |
 | Calendar lock objects | `otherbotlock…`, `othdemolock…` | `lumierelock…`, `lumdemolock…` | engine config (generated) |
 | Timezone | — | `TIMEZONE` (fixed offset only; the build refuses DST zones) | `lumiere.config.js` |
 
@@ -64,7 +64,7 @@ websiteDemo: {
 Then rebuild and check:
 
 ```powershell
-node tools/build-workflows.js; node tools/build-messenger.js; node website-demo/build-web-demo.js; node tools/build-salon-sheet.js
+node tools/build-workflows.js; node tools/build-messenger.js; node tools/build-instagram.js; node website-demo/build-web-demo.js; node tools/build-salon-sheet.js
 ```
 
 ```powershell
@@ -83,6 +83,8 @@ Use a **separate Meta app** for the salon. The WhatsApp Trigger registers the ap
 
 Messenger (optional): add the **Messenger** product to the salon app and connect the salon's Facebook Page (see `MESSENGER-SETUP.md`). Callback URL: `https://<your n8n>/webhook/lumiere-messenger`.
 
+Instagram Direct (optional): in the same salon app (verify first that it is not another bot's app), add Instagram messaging for the salon's Instagram professional account linked to the salon Page (see `INSTAGRAM-SETUP.md`). It has its **own** webhook: `https://<your n8n>/webhook/lumiere-instagram`. The Messenger webhook stays as it is.
+
 ## Step 5 — n8n credentials
 
 **Current setup (2026-11-24): account-level credentials are shared.** The older bot bot is being retired, so the salon reuses the existing Google, OpenRouter and Cohere credentials (`SHARED_CREDENTIALS` in `lumiere.config.js`). This is safe because the salon still has its own calendars, sheet, workflow IDs and lock objects. WhatsApp and Messenger can **never** be shared: the build, tests and preflight refuse it.
@@ -98,8 +100,9 @@ Messenger (optional): add the **Messenger** product to the salon app and connect
 | `LUMIERE - WhatsApp Trigger (OAuth)` | WhatsApp OAuth API | salon app's App ID (Client ID) + App secret (Client Secret) | WhatsApp Trigger |
 | `LUMIERE - WhatsApp API` | WhatsApp API | permanent token (step 4.4) + WhatsApp Business Account ID | all WhatsApp send nodes, error workflow |
 | `LUMIERE - Facebook Page Token` | Header Auth | Name `Authorization` (pre-filled), Value `Bearer <salon Page token>` | Messenger send/profile nodes |
+| `LUMIERE - Instagram Page Token` (id `lumIgPageToken01`) | Header Auth | Name `Authorization`, Value `Bearer <salon Page token with instagram_manage_messages>` | Instagram send/profile nodes |
 
-The three `LUMIERE - …` credentials were created empty in n8n with these exact ids, so every node is already linked: open each one under **Credentials** and fill it in.
+The first three `LUMIERE - …` credentials were created empty in n8n with these exact ids, so every node is already linked: open each one under **Credentials** and fill it in. **`LUMIERE - Instagram Page Token` does not exist in n8n yet**: create it with exactly this name and id before importing the Instagram workflow (`INSTAGRAM-SETUP.md` step 2).
 
 To go back to fully separate credentials: create new `LUMIERE - …` credentials, put their ids and names in `lumiere.config.js`, empty both `SHARED_CREDENTIALS` lists, rebuild and re-import.
 
@@ -115,6 +118,9 @@ Add the variables from `lumiere.env.example` to the n8n instance environment (do
 | `LUMIERE_MESSENGER_VERIFY_TOKEN` | any long random string (Messenger only) |
 | `LUMIERE_MESSENGER_APP_SECRET` | salon app's App secret (Messenger only) |
 | `LUMIERE_MESSENGER_PAGE_ID` | salon Page ID (optional) |
+| `LUMIERE_INSTAGRAM_VERIFY_TOKEN` | another long random string, not the Messenger one (Instagram only) |
+| `LUMIERE_INSTAGRAM_APP_SECRET` | salon app's App secret (Instagram only, required) |
+| `LUMIERE_INSTAGRAM_ACCOUNT_ID` | salon Instagram professional account ID (Instagram only, required) |
 
 Other bots' `CLINIC_*` variables stay as they are; the Lumière workflows never read them. `N8N_BLOCK_ENV_ACCESS_IN_NODE` must be `false` (as for the other bots). Unset Lumière variables fail closed: sends fail and staff are not messaged, rather than falling back to another bot's number.
 
@@ -130,10 +136,11 @@ Cohere Transcribe needs the audio language in every request and has no automatic
 ## Step 8 — Import into n8n (all inactive)
 
 1. Start from the **Workflows list** → **Add workflow → Import from file** (or the list's import action). **Never** use "Import from file" from inside another open workflow: that replaces the open workflow's content.
-2. Import in this order: `Salon Error Alert (Lumiere).json` → the 5 tool workflows → `Lumiere WhatsApp AI Agent (Cohere Transcribe).json` → `Lumiere Messenger AI Agent.json` (optional) → the 6 files in `website-demo/` (optional).
+2. Import in this order: `Salon Error Alert (Lumiere).json` → the 5 tool workflows → `Lumiere WhatsApp AI Agent (Cohere Transcribe).json` → `Lumiere Messenger AI Agent.json` (optional) → `Lumiere Instagram AI Agent.json` (optional) → the 6 files in `website-demo/` (optional).
+   **After the customer-key update (2026-11-25):** the 5 tool workflows, WhatsApp and Messenger changed too. Re-import all of them together (the tools need the new `customer_key` input, and their caller list includes `lumInstagramMain`), then re-publish the 5 tools.
 3. Every file arrives **inactive**, with its `lum…` ID, so the import creates new workflows and never overwrites another bot's workflow.
 4. Credentials are linked by id (step 5); only a node whose credential is missing shows a warning. Alternative to steps 1-3 that keeps the IDs for certain (Docker): `docker exec <container> n8n import:workflow --separate --input=<folder>` (done this way on 2026-11-24).
-5. Check the WhatsApp and Messenger main workflows: **Settings → Error workflow** = `Salon Error Alert (Lumière)` (pre-filled with ID `lumErrorAlert001`).
+5. Check the WhatsApp, Messenger and Instagram main workflows: **Settings → Error workflow** = `Salon Error Alert (Lumière)` (pre-filled with ID `lumErrorAlert001`).
 
 ## Step 9 — Go live (when you decide)
 
@@ -154,7 +161,7 @@ Run `node tools/preflight.js` first: it ticks the offline items and exits with a
 - [ ] `websiteDemo.CALENDAR_ID` = the new `Lumière Demo` calendar, different from the salon calendar
 - [ ] `websiteDemo.PUBLIC_WEBHOOK_URL` = `https://<n8n>/webhook/lumiere-website-demo`; `ALLOWED_ORIGINS` = the website's origin
 - [ ] Builds re-run after editing; `node tools/preflight.js` says "Offline checks passed"
-- [ ] `cd tests; npm test` → ALL SUITES PASSED (162 tests)
+- [ ] `cd tests; npm test` → ALL SUITES PASSED (228 tests)
 
 **Google (manual)**
 - [ ] Both calendars exist, and the n8n Google accounts can **make changes to events** on them
@@ -164,9 +171,10 @@ Run `node tools/preflight.js` first: it ticks the offline items and exits with a
 - [ ] Salon WhatsApp number on a **separate Meta app** (not another bot's app or number)
 - [ ] Permanent system-user token, Phone number ID and WhatsApp Business Account ID noted
 - [ ] (Messenger) salon Page connected, callback `…/webhook/lumiere-messenger`
+- [ ] (Instagram) salon Meta app confirmed separate from every other bot's app; Instagram professional account linked to the salon Page; "Allow access to messages" on; Instagram webhook `…/webhook/lumiere-instagram` with field `messages`; Advanced Access (App Review + Business Verification) before real customers - see `INSTAGRAM-SETUP.md`
 
 **n8n (manual)**
-- [ ] The 3 `LUMIERE - …` credentials (WhatsApp Trigger, WhatsApp API, Facebook Page Token) filled in; the only other credentials on Lumière nodes are the shared ones in `SHARED_CREDENTIALS`
+- [ ] The `LUMIERE - …` credentials (WhatsApp Trigger, WhatsApp API, Facebook Page Token, and - for Instagram - the new Instagram Page Token) created / filled in; the only other credentials on Lumière nodes are the shared ones in `SHARED_CREDENTIALS`
 - [ ] `LUMIERE_*` environment variables set with salon values; n8n restarted
 - [ ] Imports done from the Workflows list (never into another open workflow); everything still **inactive**
 - [ ] The other bots' workflows are untouched: same IDs, still active, same credentials, same `CLINIC_*` variables

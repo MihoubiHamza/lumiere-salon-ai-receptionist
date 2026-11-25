@@ -14,6 +14,7 @@ const ENV = require(path.join(ROOT, 'lumiere.config.js'));
 const CFG = require(path.join(ROOT, 'engine', 'config.js'));
 const WB = require(path.join(ROOT, 'tools', 'build-workflows.js'));
 const MB = require(path.join(ROOT, 'tools', 'build-messenger.js'));
+const IB = require(path.join(ROOT, 'tools', 'build-instagram.js'));
 const DB = require(path.join(ROOT, 'website-demo', 'build-web-demo.js'));
 const DEMO = require(path.join(ROOT, 'website-demo', 'demo-config.js'));
 const CLINIC = FP.collect(ROOT);
@@ -22,7 +23,7 @@ const SHARED = FP.sharedCredentials(ENV);
 const SHARED_IDS = new Set(SHARED.map((c) => c.id));
 
 // Every Lumière workflow file, tagged with the environment it belongs to.
-const SALON_FILES = Object.values(WB.OUTPUT_FILES).concat([MB.OUT_FILE]).map((f) => ({ file: f, kind: 'salon' }));
+const SALON_FILES = Object.values(WB.OUTPUT_FILES).concat([MB.OUT_FILE, IB.OUT_FILE]).map((f) => ({ file: f, kind: 'salon' }));
 const DEMO_FILES = Object.values(DB.WF).map((w) => ({ file: path.join('website-demo', w.file), kind: 'demo' }));
 const ALL = SALON_FILES.concat(DEMO_FILES).map((x) => Object.assign(x, { text: fs.readFileSync(path.join(ROOT, x.file), 'utf8') }, { wf: JSON.parse(fs.readFileSync(path.join(ROOT, x.file), 'utf8')) }));
 const SITE = DB.SITE_FILES.map((f) => ({ file: f, text: fs.readFileSync(path.join(ROOT, 'website-demo', f), 'utf8') }));
@@ -51,8 +52,8 @@ test('I2 every credential comes from lumiere.config.js: LUMIERE ones, or an acco
     assert.ok(/^LUMIERE /.test(c.name), 'credential name must start with LUMIERE: ' + c.name);
     assert.ok(!CLINIC.ids.has(c.id), 'credential id reused from the clinic without being listed in SHARED_CREDENTIALS: ' + c.id);
   }
-  // WhatsApp, the WhatsApp trigger and the Facebook Page token are always the salon's own.
-  for (const k of ['whatsApp', 'whatsAppTrigger', 'facebookPage']) {
+  // WhatsApp, the WhatsApp trigger, the Facebook Page token and the Instagram token are always the salon's own.
+  for (const k of ['whatsApp', 'whatsAppTrigger', 'facebookPage', 'instagram']) {
     assert.ok(/^LUMIERE /.test(ENV.credentials[k].name) && !CLINIC.ids.has(ENV.credentials[k].id), k + ' must be a LUMIERE credential');
     const bad = JSON.parse(JSON.stringify(ENV));
     bad.SHARED_CREDENTIALS = [k];
@@ -75,7 +76,10 @@ test('I3 environment variables: only the LUMIERE_* names from lumiere.config.js,
     assert.ok(x.text.indexOf('CLINIC_') < 0, x.file + ' still mentions a CLINIC_ variable');
     for (const m of x.text.matchAll(/\$env\.([A-Za-z_]+)/g)) { used.add(m[1]); assert.ok(allowed.has(m[1]), x.file + ' reads $env.' + m[1] + ', which is not in lumiere.config.js'); }
   }
-  for (const v of ['WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_ACCESS_TOKEN', 'STAFF_CHAT_ID', 'MESSENGER_APP_SECRET', 'MESSENGER_VERIFY_TOKEN']) assert.ok(used.has(ENV.env[v]), ENV.env[v] + ' is used');
+  for (const v of ['WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_ACCESS_TOKEN', 'STAFF_CHAT_ID', 'MESSENGER_APP_SECRET', 'MESSENGER_VERIFY_TOKEN', 'INSTAGRAM_APP_SECRET', 'INSTAGRAM_VERIFY_TOKEN', 'INSTAGRAM_ACCOUNT_ID']) assert.ok(used.has(ENV.env[v]), ENV.env[v] + ' is used');
+  // Messenger and Instagram never read each other's variables.
+  const ig = ALL.find((x) => x.file === IB.OUT_FILE).text, fb = ALL.find((x) => x.file === MB.OUT_FILE).text;
+  assert.ok(ig.indexOf('LUMIERE_MESSENGER_') < 0 && fb.indexOf('LUMIERE_INSTAGRAM_') < 0, 'Messenger / Instagram variables are kept apart');
   // The website demo never touches WhatsApp or env secrets.
   for (const x of ALL.filter((y) => y.kind === 'demo')) assert.ok(x.text.indexOf('$env.') < 0, x.file + ' reads an environment variable');
 });
@@ -95,7 +99,7 @@ test('I4 workflow IDs come from lumiere.config.js, are unique, never a clinic ID
     }
     if (x.wf.settings && x.wf.settings.errorWorkflow) assert.strictEqual(x.wf.settings.errorWorkflow, ENV.workflows.error, x.file + ' error workflow');
   }
-  for (const f of [WB.FILES.main, MB.OUT_FILE]) assert.strictEqual(ALL.find((x) => x.file === f).wf.settings.errorWorkflow, ENV.workflows.error, f + ' is linked to the Lumière error workflow');
+  for (const f of [WB.FILES.main, MB.OUT_FILE, IB.OUT_FILE]) assert.strictEqual(ALL.find((x) => x.file === f).wf.settings.errorWorkflow, ENV.workflows.error, f + ' is linked to the Lumière error workflow');
 });
 
 test('I5 webhooks: own paths and webhook ids, never shared with the clinic; the website posts to the Lumière demo webhook', () => {
@@ -105,7 +109,7 @@ test('I5 webhooks: own paths and webhook ids, never shared with the clinic; the 
     if (n.type === 'n8n-nodes-base.webhook') paths.push(n.parameters.path);
   }
   for (const p of paths) assert.ok(!CLINIC.paths.has(p), 'webhook path ' + p + ' is used by a clinic workflow');
-  assert.deepStrictEqual([...new Set(paths)].sort(), [ENV.MESSENGER_WEBHOOK_PATH, ENV.websiteDemo.WEBHOOK_PATH].sort());
+  assert.deepStrictEqual([...new Set(paths)].sort(), [ENV.MESSENGER_WEBHOOK_PATH, ENV.INSTAGRAM_WEBHOOK_PATH, ENV.websiteDemo.WEBHOOK_PATH].sort());
   assert.strictEqual(new Set(hookIds).size, hookIds.length, 'duplicate webhookIds');
   for (const h of hookIds) assert.ok(!CLINIC.webhookIds.has(h), 'webhookId ' + h + ' is used by a clinic workflow');
   assert.ok(ENV.websiteDemo.PUBLIC_WEBHOOK_URL.endsWith('/webhook/' + ENV.websiteDemo.WEBHOOK_PATH));
@@ -127,7 +131,7 @@ test('I6 Google resources: one salon sheet (tabs by name), the salon calendar, a
     }
     if (n.parameters && n.parameters.calendar && x.kind === 'salon') assert.strictEqual(n.parameters.calendar.value, CFG.CALENDAR_ID, n.name);
   }
-  assert.strictEqual(sheetNodes, 9, 'the 9 Sheets nodes of WhatsApp + Messenger');
+  assert.strictEqual(sheetNodes, 13, 'the 13 Sheets nodes of WhatsApp (5) + Messenger (4) + Instagram (4)');
   assert.strictEqual(ALL.find((x) => x.file === WB.FILES.main).wf.nodes.find((n) => n.name === 'Get Clinic Info').parameters.sheetName.value, ENV.google.SHEET_TABS.salonInfo);
   assert.strictEqual(CFG.CALENDAR_ID, ENV.google.CALENDAR_ID);
   assert.strictEqual(CFG.LOCK_CALENDAR_ID, ENV.google.LOCK_CALENDAR_ID || ENV.google.CALENDAR_ID);
@@ -173,9 +177,9 @@ test('I8 voice notes: one configured language, told to the AI; unsupported model
 test('I9 the builds never read-modify or write the clinic folders, and only write inside this project', () => {
   const hashDir = (dir) => { const h = crypto.createHash('sha256'); for (const f of fs.readdirSync(dir).sort()) { const p = path.join(dir, f); if (fs.statSync(p).isFile()) h.update(f + '\0' + fs.readFileSync(p)); } return h.digest('hex'); };
   const before = CLINIC.scannedDirs.map(hashDir);
-  WB.build(); MB.build(); DB.build(); DB.siteFiles();
+  WB.build(); MB.build(); IB.build(); DB.build(); DB.siteFiles();
   assert.deepStrictEqual(CLINIC.scannedDirs.map(hashDir), before, 'a clinic folder changed during the builds');
-  const outputs = Object.values(WB.OUTPUT_FILES).concat([MB.OUT_FILE]).map((f) => path.resolve(ROOT, f))
+  const outputs = Object.values(WB.OUTPUT_FILES).concat([MB.OUT_FILE, IB.OUT_FILE]).map((f) => path.resolve(ROOT, f))
     .concat(Object.values(DB.WF).map((w) => path.resolve(DB.OUT_DIR, w.file))).concat(DB.SITE_FILES.map((f) => path.resolve(DB.OUT_DIR, f)));
   for (const o of outputs) assert.ok(o.indexOf(ROOT + path.sep) === 0, 'build output outside the project: ' + o);
 });

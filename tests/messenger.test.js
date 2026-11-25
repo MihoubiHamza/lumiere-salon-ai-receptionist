@@ -24,6 +24,8 @@ const VERIFY = 'verify-me-token';
 const PAGE = '102030405060708';
 // Page-Scoped IDs (16-17 digits, like real ones) and a WhatsApp patient number.
 const A = '24906340422315839', B = '7612345678901234', WAP = '213555000001';
+// Channel-aware customer key of a Messenger user on the salon Page.
+const FK = (psid, page) => 'fb:' + (page || PAGE) + ':' + psid;
 const REPLY = 'مرحبا، كيفاش نقدر نعاونك؟';
 const byNode = (w, n) => w.nodes.find((x) => x.name === n);
 
@@ -107,7 +109,9 @@ const metaJson = (o) => JSON.stringify(o).replace(/[\u0080-￿]/g, (c) => '\\u' 
 const sign = (raw, secret) => 'sha256=' + crypto.createHmac('sha256', secret || SECRET).update(raw).digest('hex');
 function post(e, events, o) {
   o = o || {};
-  const raw = o.raw || metaJson({ object: 'page', entry: [{ id: PAGE, time: e.sim.now, messaging: events }] });
+  const entry = { id: o.page !== undefined ? o.page : PAGE, time: e.sim.now, messaging: events };
+  if (entry.id === null) delete entry.id;
+  const raw = o.raw || metaJson({ object: 'page', entry: [entry] });
   const headers = { 'content-type': 'application/json' };
   if (o.sig !== null) headers['x-hub-signature-256'] = o.sig || sign(o.signedRaw || raw, o.secret);
   const item = { json: { headers, params: {}, query: {}, body: JSON.parse(raw) } };
@@ -135,7 +139,7 @@ const aiFor = (e, chat) => e.rec.ai.filter((a) => a.chat === chat).sort((x, y) =
 const fbTo = (e, psid) => e.rec.sends.filter((s) => s.channel === 'messenger' && s.to === psid);
 const staffAlerts = (e) => e.rec.sends.filter((s) => s.to === STAFF);
 function lockFree(e, chat) {
-  const st = e.cal.lockState(LOCKCAL, chatLock(chat));
+  const st = e.cal.lockState(LOCKCAL, chatLock(/^\d{16,}$/.test(chat) ? FK(chat) : chat));
   assert.ok(st, 'no chat lock object for ' + chat);
   assert.ok(!st.h || st.hx <= e.sim.now, 'chat lock for ' + chat + ' still held at end');
   assert.deepStrictEqual(st.w || [], [], 'waiters left behind for ' + chat);
@@ -244,8 +248,9 @@ test('MG5 tools: same sub-workflows as WhatsApp, identity from the verified send
     assert.strictEqual(m.parameters.workflowId.value, wa.parameters.workflowId.value, tool + ' must call the same sub-workflow');
     assert.deepStrictEqual(Object.keys(m.parameters.workflowInputs.value).sort(), Object.keys(wa.parameters.workflowInputs.value).sort(), tool);
     assert.deepStrictEqual(m.parameters.workflowInputs.schema, wa.parameters.workflowInputs.schema, tool);
-    const ph = m.parameters.workflowInputs.value.phone_number;
-    if (ph) assert.strictEqual(ph, wa.parameters.workflowInputs.value.phone_number, tool + ': phone_number must be the verified sender id');
+    const v = m.parameters.workflowInputs.value;
+    if ('phone_number' in v) assert.strictEqual(v.phone_number, '', tool + ': Messenger has no phone identity - the customer key is the identity');
+    if (tool !== 'Check_Availability') assert.strictEqual(v.customer_key, WB.CUSTOMER_KEY_EXPR, tool + ': customer_key must be the verified sender key (never the AI)');
     for (const [p, s] of strings(m.parameters, tool)) assert.ok(!/current WhatsApp number|than the one (they are )?texting/.test(s), p + ' still talks about the WhatsApp number');
   }
   assert.ok(/Messenger - Tel:/.test(byNode(MSG, 'Book_Appointment').parameters.workflowInputs.value.notes));
@@ -317,7 +322,7 @@ test('M2 signed text message -> one AI turn, reply on Messenger to that PSID, lo
   assert.ok(aiFor(e, A)[0].prompt.indexOf('Channel: Facebook Messenger') >= 0 && aiFor(e, A)[0].prompt.indexOf(A) < 0, 'the PSID is never shown to the AI');
   assert.deepStrictEqual(fbTo(e, A).map((s) => [s.node, s.text]), [['Send Messenger Reply', REPLY]]);
   assert.strictEqual(staffAlerts(e).length, 0);
-  assert.deepStrictEqual(e.rec.logs.map((l) => l.phone), ['fb:' + A + ' (Sara Benali)']);
+  assert.deepStrictEqual(e.rec.logs.map((l) => l.phone), [FK(A) + ' (Sara Benali)']);
   lockFree(e, A);
 });
 
@@ -432,7 +437,7 @@ test('M9 image -> polite unsupported reply; like sticker -> "👍"; Get Started 
   assert.deepStrictEqual(e.rec.ai.map((c) => c.text), ['👍', 'Get Started']);
 });
 
-test('M10 escalation: "fb:<PSID>" pause row written before the reply; bot silent until staff unmute in the sheet', async () => {
+test('M10 escalation: "fb:<page>:<PSID>" pause row written before the reply; bot silent until staff unmute in the sheet', async () => {
   let alert = null;
   const e = env({ seed: 213, ai: { behave: (c, run) => (c.text === 'عندي نزيف'
     ? { output: 'روح للاستعجالات فورا، فريق العيادة غادي يتواصل معاك.', tools: async () => {
@@ -446,13 +451,13 @@ test('M10 escalation: "fb:<PSID>" pause row written before the reply; bot silent
   await all(e, [at(e, 0, () => post(e, [a])), at(e, 1000, () => post(e, [b]))]);
   noErrors(e);
   assert.deepStrictEqual(aiFor(e, A).map((c) => c.text), ['عندي نزيف'], 'second message must not reach the AI');
-  assert.deepStrictEqual(e.sheet.handoffs, [{ Patient_ID: 'fb:' + A, Status: 'paused' }]);
+  assert.deepStrictEqual(e.sheet.handoffs, [{ Patient_ID: FK(A), Status: 'paused' }]);
   const pauseAt = e.rec.sheetsWrites[0].t, replyAt = fbTo(e, A)[0].t;
   assert.ok(pauseAt <= replyAt, 'pause persisted before the reply');
   assert.strictEqual(fbTo(e, A).length, 1);
   assert.strictEqual(alert.to, STAFF);
   assert.ok(/^⚠️ \[Messenger\] possible medical emergency/.test(alert.text.body), alert.text.body);
-  assert.ok(alert.text.body.indexOf('Sara Benali') > 0 && alert.text.body.indexOf('fb:' + A) > 0 && /Status = unmuted/.test(alert.text.body), alert.text.body);
+  assert.ok(alert.text.body.indexOf('Sara Benali') > 0 && alert.text.body.indexOf('row ' + FK(A) + ' ->') > 0 && /Status = unmuted/.test(alert.text.body), alert.text.body);
   lockFree(e, A);
   e.sheet.handoffs[0].Status = 'unmuted'; // staff re-enable the bot
   await all(e, [() => post(e, [ev(e, A, { text: 'شكرا' })])]);
@@ -461,10 +466,24 @@ test('M10 escalation: "fb:<PSID>" pause row written before the reply; bot silent
 
 test('M11 pause rows never cross channels (Messenger rows vs WhatsApp numbers, bare digits vs fb: prefix)', async () => {
   const e = env({ seed: 214 });
-  e.sheet.handoffs.push({ Patient_ID: 'fb:' + A, Status: 'paused' }, { Patient_ID: B, Status: 'paused' }, { Patient_ID: WAP, Status: 'paused' });
+  e.sheet.handoffs.push({ Patient_ID: FK(A), Status: 'paused' }, { Patient_ID: B, Status: 'paused' }, { Patient_ID: WAP, Status: 'paused' });
   await all(e, [() => post(e, [ev(e, A, { text: 'a' })]), () => post(e, [ev(e, B, { text: 'b' })]), () => deliver(e, waMessage(e, '213555000002', { text: 'wa' }))]);
   noErrors(e);
   assert.deepStrictEqual(e.rec.ai.map((c) => c.text).sort(), ['b', 'wa'], 'only fb:A is paused on Messenger; the WhatsApp patient is unaffected');
+});
+
+test('M11b migration: a pause row written before customer keys ("fb:<PSID>") still pauses; other Pages and Instagram rows never do', async () => {
+  const e = env({ seed: 233 });
+  e.sheet.handoffs.push({ Patient_ID: 'fb:' + A, Status: 'paused' }, { Patient_ID: FK(B, '999888777666555'), Status: 'paused' }, { Patient_ID: 'ig:17841400000000001:' + B, Status: 'paused' });
+  await all(e, [() => post(e, [ev(e, A, { text: 'a' })]), () => post(e, [ev(e, B, { text: 'b' })])]);
+  noErrors(e);
+  assert.deepStrictEqual(e.rec.ai.map((c) => c.text), ['b'], 'legacy fb:<PSID> row keeps A paused; B is paused only on another Page / on Instagram');
+  // A WhatsApp customer is never paused by a Messenger or Instagram row, even when the digits would match.
+  const w = env({ seed: 234 });
+  w.sheet.handoffs.push({ Patient_ID: 'fb:' + WAP, Status: 'paused' }, { Patient_ID: 'ig:' + WAP, Status: 'paused' });
+  await all(w, [() => deliver(w, waMessage(w, WAP, { text: 'wa' }))]);
+  noErrors(w);
+  assert.deepStrictEqual(w.rec.ai.map((c) => c.text), ['wa']);
 });
 
 test('M12 replies longer than 2000 characters are split into two Messenger messages, in order, nothing lost', async () => {
@@ -491,7 +510,7 @@ test('M13 Messenger send failure -> staff alerted on WhatsApp (with patient name
   await all(e, [at(e, 0, () => post(e, [a])), at(e, 500, () => post(e, [b]))]);
   noErrors(e);
   const alert = staffAlerts(e).find((s) => s.node === 'Alert Staff - System Error');
-  assert.ok(alert && alert.text.indexOf('[Messenger]') >= 0 && alert.text.indexOf('Sara Benali') >= 0 && alert.text.indexOf('fb:' + A) >= 0, alert && alert.text);
+  assert.ok(alert && alert.text.indexOf('[Messenger]') >= 0 && alert.text.indexOf('Sara Benali') >= 0 && alert.text.indexOf(FK(A)) >= 0, alert && alert.text);
   assert.strictEqual(aiFor(e, A).length, 2);
   lockFree(e, A);
 });
@@ -509,25 +528,30 @@ test('M14 AI failure / lock store down / profile lookup down -> patient still an
   assert.strictEqual(d.rec.ai.length, 0, 'never process unserialized');
   assert.deepStrictEqual(fbTo(d, A).map((s) => s.node), ['Send Fallback Reply']);
   const alert = staffAlerts(d).find((s) => s.node === 'Alert Staff - System Error');
-  assert.ok(alert && alert.text.indexOf('fb:' + A) >= 0, 'alert works before the profile was fetched');
+  assert.ok(alert && alert.text.indexOf(FK(A)) >= 0, 'alert works before the profile was fetched');
   const p = env({ seed: 219 }); p.faults.profile = true;
   await all(p, [() => post(p, [ev(p, A, { text: 'hi' })])]);
   noErrors(p);
   assert.deepStrictEqual(fbTo(p, A).map((s) => s.node), ['Send Messenger Reply']);
-  assert.deepStrictEqual(p.rec.logs.map((l) => l.phone), ['fb:' + A]);
+  assert.deepStrictEqual(p.rec.logs.map((l) => l.phone), [FK(A)]);
 });
 
 // ------------------------------------------------------------------ appointments across channels
-const slot = (phone, name) => ({ start_datetime: '2026-10-06T10:00:00', end_datetime: '2026-10-06T10:30:00', summary: name + ' - Kashf', notes: 'Messenger - Tel: 0555000009 | ' + name, phone_number: phone });
-function toolPhone(run, tool) { return run.evalExpr(run.nodes.get(tool).parameters.workflowInputs.value.phone_number, run.exprCtx(null, 0, [])); }
+// The identity a tool node really sends (server-set phone_number + customer_key).
+function toolIdent(run, tool) {
+  const v = run.nodes.get(tool).parameters.workflowInputs.value, ctx = run.exprCtx(null, 0, []);
+  return { phone_number: run.evalExpr(v.phone_number, ctx), customer_key: run.evalExpr(v.customer_key, ctx) };
+}
+const slot = (ident, name) => Object.assign({ start_datetime: '2026-10-06T10:00:00', end_datetime: '2026-10-06T10:30:00', summary: name + ' - Kashf', notes: 'Messenger - Tel: 0555000009 | ' + name },
+  typeof ident === 'string' ? { phone_number: ident } : ident);
 
 test('M15 a Messenger booking belongs to that Messenger conversation: found from it, invisible to others', async () => {
   const found = {};
   const e = env({ seed: 220, ai: { behave: (c, run) => ({
     output: REPLY,
     tools: async (env2) => {
-      if (c.text === 'book') { const r = await callTool(env2, 'book', slot(toolPhone(run, 'Book_Appointment'), 'Sara Benali')); c.res = r.result; }
-      else { const r = await callTool(env2, 'find', { phone_number: toolPhone(run, 'Find_Patient_Appointments'), patient_name: '', appointment_date: '', booked_phone_number: '' }); found[c.chat] = r.result; }
+      if (c.text === 'book') { const r = await callTool(env2, 'book', slot(toolIdent(run, 'Book_Appointment'), 'Sara Benali')); c.res = r.result; }
+      else { const r = await callTool(env2, 'find', Object.assign({ patient_name: '', appointment_date: '', booked_phone_number: '' }, toolIdent(run, 'Find_Patient_Appointments'))); found[c.chat] = r.result; }
       return [];
     },
   }) } });
@@ -535,7 +559,7 @@ test('M15 a Messenger booking belongs to that Messenger conversation: found from
   assert.ok(/^SUCCESS/.test(e.rec.ai[0].res), e.rec.ai[0].res);
   const evs = e.cal.events(CFG.CALENDAR_ID);
   assert.strictEqual(evs.length, 1);
-  assert.ok(evs[0].description.indexOf('Phone: ' + A + '. Notes: Messenger - Tel: 0555000009') === 0, evs[0].description);
+  assert.ok(evs[0].description.indexOf('Customer: ' + FK(A) + '. Notes: Messenger - Tel: 0555000009') === 0, evs[0].description);
   await all(e, [() => post(e, [ev(e, A, { text: 'find' })]), () => post(e, [ev(e, B, { text: 'find' })]), () => deliver(e, waMessage(e, WAP, { text: 'find' }))]);
   noErrors(e);
   assert.ok(/^FOUND: 1\) Sara Benali - Kashf on 2026-10-06 at 10:00/.test(found[A]), found[A]);
@@ -547,7 +571,7 @@ test('M16 a WhatsApp patient and a Messenger patient booking the same slot at th
   for (const seed of [221, 222, 223]) {
     const e = env({ seed, ai: { thinkMs: 500, behave: (c, run) => ({
       thinkMs: 500, output: REPLY,
-      tools: async (env2) => { const r = await callTool(env2, 'book', slot(toolPhone(run, 'Book_Appointment'), c.chat === A ? 'Sara Benali' : 'Amine Kaci')); c.res = r.result; return []; },
+      tools: async (env2) => { const r = await callTool(env2, 'book', slot(toolIdent(run, 'Book_Appointment'), c.chat === A ? 'Sara Benali' : 'Amine Kaci')); c.res = r.result; return []; },
     }) } });
     await all(e, [at(e, 0, () => post(e, [ev(e, A, { text: 'book' })])), at(e, 5, () => deliver(e, waMessage(e, WAP, { text: 'book' })))]);
     noErrors(e);
@@ -557,13 +581,52 @@ test('M16 a WhatsApp patient and a Messenger patient booking the same slot at th
   }
 });
 
-test('M17 a Messenger patient can still manage a WhatsApp/phone booking by giving the booked number', async () => {
+test('M17 a Messenger customer can NOT manage a WhatsApp/phone booking by typing its number (staff only, nothing revealed)', async () => {
   const e = env({ seed: 224 });
-  const find = (booked) => callTool(e, 'find', { phone_number: A, patient_name: '', appointment_date: '', booked_phone_number: booked });
+  const find = (booked) => callTool(e, 'find', { phone_number: '', customer_key: FK(A), patient_name: '', appointment_date: '', booked_phone_number: booked });
   const r = {};
   await all(e, [async () => { await callTool(e, 'book', slot(WAP, 'Amine Kaci')); r.psid = await find(''); r.num = await find('0555000001'); }]);
   assert.ok(/^NOT_FOUND/.test(r.psid.result), r.psid.result);
-  assert.ok(/^FOUND: 1\) Amine Kaci/.test(r.num.result), r.num.result);
+  // Before 2026-11-25 this returned "FOUND: 1) Amine Kaci ...".
+  assert.ok(/^NEED_STAFF/.test(r.num.result) && r.num.result.indexOf('Amine') < 0, r.num.result);
+});
+
+test('M18 the same PSID on another Page, on Instagram or as a phone number is a different customer (lock, appointments)', async () => {
+  const P2 = '909090909090909';
+  const e = env({ seed: 235 });
+  const find = (ident) => callTool(e, 'find', Object.assign({ phone_number: '', patient_name: '', appointment_date: '', booked_phone_number: '' }, ident));
+  const r = {};
+  await all(e, [async () => {
+    r.book = await callTool(e, 'book', slot({ phone_number: '', customer_key: FK(A) }, 'Sara Benali'));
+    r.own = await find({ customer_key: FK(A) });
+    r.page2 = await find({ customer_key: FK(A, P2) });
+    r.ig = await find({ customer_key: 'ig:' + PAGE + ':' + A });
+    r.digits = await find({ phone_number: A });
+    r.booked = await find({ customer_key: FK(B), booked_phone_number: '+' + A.slice(0, 15) });
+  }]);
+  assert.ok(/^SUCCESS/.test(r.book.result), r.book.result);
+  assert.ok(/^FOUND: 1\) Sara Benali/.test(r.own.result), r.own.result);
+  for (const k of ['page2', 'ig', 'digits', 'booked']) assert.ok(!/^FOUND/.test(r[k].result), k + ' must not see the Messenger booking: ' + r[k].result);
+  assert.notStrictEqual(chatLock(FK(A)), chatLock(FK(A, P2)));
+  assert.notStrictEqual(chatLock(FK(A)), chatLock('ig:' + PAGE + ':' + A));
+  assert.notStrictEqual(chatLock(FK(A)), chatLock(A));
+  // Same PSID delivered by two Pages -> two customers, two lock objects, both answered.
+  const w = env({ seed: 236 });
+  await all(w, [() => post(w, [ev(w, A, { text: 'p1' })]), () => post(w, [ev(w, A, { text: 'p2' })], { page: P2 })]);
+  noErrors(w);
+  assert.deepStrictEqual(w.rec.ai.map((c) => c.text).sort(), ['p1', 'p2']);
+  lockFree(w, FK(A)); lockFree(w, FK(A, P2));
+});
+
+test('M19 malformed events (no Page id, non-numeric ids) are dropped before any processing', async () => {
+  const e = env({ seed: 237 });
+  await all(e, [
+    () => post(e, [ev(e, A, { text: 'no page' })], { page: null }),
+    () => post(e, [ev(e, A, { text: 'bad page' })], { page: 'abc' }),
+    () => post(e, [ev(e, 'not-a-psid', { text: 'bad sender' })]),
+  ]);
+  noErrors(e);
+  assert.strictEqual(e.rec.ai.length + e.rec.sends.length, 0);
 });
 
 test('MX mutations prove the checks are load-bearing: without them a forged request is processed / a bare PSID row pauses', async () => {
@@ -572,7 +635,7 @@ test('MX mutations prove the checks are load-bearing: without them a forged requ
   const e = env({ seed: 230 });
   await all(e, [() => runMessenger(e, 'Messenger Webhook', [{ json: { headers: {}, params: {}, query: {}, body: { object: 'page', entry: [{ id: PAGE, messaging: [ev(e, A, { text: 'forged' })] }] } } }], noSig)]);
   assert.strictEqual(e.rec.ai.length, 1, 'mutation should have let the forged message through');
-  const digits = mutate('Match Pause Status', "const key = 'fb:' + ", "const key = '' + ");
+  const digits = mutate('Match Pause Status', "const keys = [d.customerKey, 'fb:' + d.chatId];", "const keys = [d.customerKey, 'fb:' + d.chatId, d.chatId];");
   const d = env({ seed: 231 });
   d.sheet.handoffs.push({ Patient_ID: A, Status: 'paused' });
   await all(d, [() => post(d, [ev(d, A, { text: 'x' })])]);

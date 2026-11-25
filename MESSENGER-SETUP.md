@@ -11,16 +11,18 @@ It does not replace or modify the WhatsApp workflow. Both run side by side.
 | AI prompt, tools, safety checks (Sanitize, escalation, chat lock) | original | same rules, Messenger wording |
 | Calendar tools (Book / Cancel / Reschedule / Find / Check) | the 5 sub-workflows | **the same 5 sub-workflows** (unchanged) |
 | Double-booking protection | calendar write lock | **the same lock**: a WhatsApp and a Messenger customer can never get the same slot |
-| Customer identity | WhatsApp number (verified by Meta) | Messenger sender ID (PSID, verified by Meta's signature) |
+| Customer identity | customer key `wa:<number>` (verified by Meta) | customer key `fb:<page_id>:<PSID>` (sender ID verified by Meta's signature, scoped to the salon Page) |
 | Customer's phone number | automatic | Yasmine **asks for it** and saves it in the booking notes (`Messenger - Tel: …`) |
 | Replies to the customer | WhatsApp | Messenger (long replies over 2000 characters are sent as 2 messages) |
 | Staff alerts | WhatsApp to staff | **WhatsApp to staff** (same number, same credential) |
-| Pause after escalation | `Active_Handoffs` row = phone | `Active_Handoffs` row = `fb:<PSID>` |
+| Pause after escalation | `Active_Handoffs` row = phone | `Active_Handoffs` row = `fb:<page_id>:<PSID>` (older `fb:<PSID>` rows still pause) |
 | Re-enable the bot | staff send `!unmute <number>` on WhatsApp | staff set that row's **Status** to `unmuted` (or delete the row) |
 
 In Google Calendar, a Messenger booking looks like this:
-`Phone: 24906340422315839. Notes: Messenger - Tel: +34 600 000 000 | Lucía Fernández`.
-The long "Phone" value is the Messenger ID and is used by the bot to find the appointment again. **The salon should call the number after `Tel:`.**
+`Customer: fb:102030405060708:24906340422315839. Notes: Messenger - Tel: +34 600 000 000 | Lucía Fernández`.
+The `Customer:` value is the customer key (Page ID + Messenger ID). The bot uses it to find the appointment again, and only from this same conversation. **The salon should call the number after `Tel:`.**
+
+Bookings made before the customer-key update (2026-11-25) started with `Phone: <Messenger ID>`. They are no longer linked to any conversation, so staff handle them by hand. Messenger was never activated, so only test bookings used that format.
 
 ## One-time setup
 
@@ -72,18 +74,18 @@ On the first contact, Messenger can show a "Get Started" button. Yasmine treats 
 2. Send a voice note. It should be transcribed and answered. *Voice notes are supported only in the configured `VOICE_LANGUAGE`, and Messenger clips are MP4/AAC, which Cohere's documentation does not list (flac, mp3, mpeg, mpga, ogg, wav). Treat Messenger voice notes as unsupported until this test passes; if Cohere rejects them, the customer gets the "couldn't understand the voice note" reply.*
 3. Book a test appointment. Yasmine should ask for your mobile number. The event should show `Notes: Messenger - Tel: …`.
 4. Ask "when is my appointment?" from the same account. The booking should be found.
-5. Say you want to talk to a human. Staff should get a WhatsApp alert marked `[Messenger]` with the customer's name. After that the bot stays silent. Then set the `fb:…` row in `Active_Handoffs` to `unmuted`, and the bot should answer again.
+5. Say you want to talk to a human. Staff should get a WhatsApp alert marked `[Messenger]` with the customer's name. After that the bot stays silent. Then set the `fb:<page_id>:<PSID>` row in `Active_Handoffs` to `unmuted`, and the bot should answer again.
 6. In n8n **Executions**, every message appears twice: first the webhook run (receive and verify), then the message's own run (starting at `Messenger Event`). A run that ends at `Rejected - Bad Signature` means `LUMIERE_MESSENGER_APP_SECRET` is wrong or missing.
 
 ## How staff work with Messenger customers
 - Staff alerts arrive on **WhatsApp**, marked `[Messenger]`, with the customer's Facebook name and last message.
 - Staff reply to the customer from the **Facebook Page inbox** (Meta Business Suite).
-- To give the conversation back to Yasmine, open the `Active_Handoffs` sheet, find the row `fb:<id>` named in the alert, and set **Status** to `unmuted` (or delete the row).
-  The WhatsApp `!unmute` command cannot be used for Messenger customers: a Messenger ID has 16–17 digits, and Google Sheets would round it as a number. That is why Messenger rows use the `fb:` prefix.
-- To make Yasmine stop answering a Messenger customer without an escalation, add a row `Patient_ID = fb:<id>`, `Status = paused`. (`Patient_ID` is the existing column name in the sheet; it holds the customer ID.) The ID and the customer's name appear in the `Phone` column of `ConversationLog`.
+- To give the conversation back to Yasmine, open the `Active_Handoffs` sheet, find the row `fb:<page_id>:<PSID>` named in the alert, and set **Status** to `unmuted` (or delete the row).
+  The WhatsApp `!unmute` command cannot be used for Messenger customers: a Messenger ID has 16–17 digits, and Google Sheets would round it as a number. That is why Messenger rows use the `fb:<page_id>:` prefix (it also keeps them apart from Instagram rows, `ig:…`).
+- To make Yasmine stop answering a Messenger customer without an escalation, add a row `Patient_ID = fb:<page_id>:<PSID>`, `Status = paused`. (`Patient_ID` is the existing column name in the sheet; it holds the customer key.) The key and the customer's name appear in the `Phone` column of `ConversationLog`.
 
 ## Things that behave differently from WhatsApp
-- A booking made on Messenger is managed from that Messenger conversation. A booking made on WhatsApp or by phone is not found automatically on Messenger: Yasmine asks for the number it was booked with (the existing "booked from a different number" procedure).
+- A booking made on Messenger is managed from that Messenger conversation. A booking made on WhatsApp, on Instagram or by phone can never be found or changed from Messenger. A phone number the customer types is never proof that a booking is theirs, so Yasmine does not ask for it. She says she can only manage bookings made from this conversation, and hands the customer to staff (Escalate_to_Staff).
 - A Messenger booking cannot be managed from WhatsApp (the WhatsApp bot looks up the WhatsApp number). Staff can always handle it manually.
 - If you later add appointment reminders that message the `Phone:` of each event, skip events whose notes start with `Messenger -` (their `Phone:` is a Messenger ID, not a phone number).
 
@@ -97,7 +99,7 @@ cd tests && npm test
 Then re-import the Messenger workflow. Do not edit the Messenger workflow by hand in n8n: the next build overwrites the changes. The test `MG1` fails while the Messenger file is out of date.
 
 ## Not verified live (no Meta/n8n environment was available)
-All logic is covered by executable tests (`tests/messenger.test.js`, 25 tests), but these points need a real check:
+All logic is covered by executable tests (`tests/messenger.test.js`, 28 tests), but these points need a real check:
 - n8n's Webhook node **Raw Body** option on your n8n version. If the raw body is not exposed, the signature is verified from Meta's escaped JSON format. Both paths are tested, but check that a real message is not rejected.
 - The self-call (`Process Each Message` → `Messenger Event` via `$workflow.id`, "don't wait for sub-workflow").
 - Cohere transcription of Messenger's MP4/AAC voice clips.

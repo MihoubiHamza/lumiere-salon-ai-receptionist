@@ -45,13 +45,18 @@ module.exports = {
     openRouter: { id: '3JRN7dwrwfWdcPVS', name: 'OpenRouter account' }, // shared
     cohere: { id: '2KXHYFXQUgXkYyRh', name: 'Header Auth account' }, // shared (Cohere key)
     facebookPage: { id: 'lumFbPageToken01', name: 'LUMIERE - Facebook Page Token' },
+    // Instagram Direct via the Messenger Platform: a Page access token (of the salon Page
+    // linked to the salon's Instagram professional account) with instagram_manage_messages.
+    // Its own credential so it can be rotated / revoked without touching Messenger.
+    instagram: { id: 'lumIgPageToken01', name: 'LUMIERE - Instagram Page Token' },
   },
   // Account-level credentials deliberately SHARED with the older bots on the instance
   // (decided 2026-11-24: the older bot bot is being retired). Sharing them is safe
   // because the salon still uses its own calendars, sheet, IDs and lock objects.
   // Only googleCalendar, googleSheets, openRouter and cohere may be listed here:
-  // WhatsApp, the WhatsApp trigger and the Facebook Page token always stay the
-  // salon's own (sharing them would answer on the clinic's number or page).
+  // WhatsApp, the WhatsApp trigger, the Facebook Page token and the Instagram token
+  // always stay the salon's own (sharing them would answer on another bot's number,
+  // page or account).
   // To go back to fully separate credentials, empty this list and use LUMIERE ids.
   SHARED_CREDENTIALS: ['googleCalendar', 'googleSheets', 'openRouter', 'cohere'],
 
@@ -65,6 +70,9 @@ module.exports = {
     MESSENGER_VERIFY_TOKEN: 'LUMIERE_MESSENGER_VERIFY_TOKEN',
     MESSENGER_APP_SECRET: 'LUMIERE_MESSENGER_APP_SECRET',
     MESSENGER_PAGE_ID: 'LUMIERE_MESSENGER_PAGE_ID', // optional
+    INSTAGRAM_VERIFY_TOKEN: 'LUMIERE_INSTAGRAM_VERIFY_TOKEN', // Instagram webhook verification (its own value)
+    INSTAGRAM_APP_SECRET: 'LUMIERE_INSTAGRAM_APP_SECRET', // App Secret of the salon Meta app (signature check)
+    INSTAGRAM_ACCOUNT_ID: 'LUMIERE_INSTAGRAM_ACCOUNT_ID', // REQUIRED: the salon's Instagram professional account ID
   },
 
   // ---- n8n workflow IDs (fixed so the tool links work after import; none of
@@ -78,8 +86,10 @@ module.exports = {
     check: 'lumCheckAvail001',
     error: 'lumErrorAlert001',
     messenger: 'lumMessengerMain',
+    instagram: 'lumInstagramMain',
   },
   MESSENGER_WEBHOOK_PATH: 'lumiere-messenger',
+  INSTAGRAM_WEBHOOK_PATH: 'lumiere-instagram', // its own webhook: the Messenger webhook is never touched
 
   // ---- Website demo (website-demo/README.md). Separate calendar, credentials,
   // workflow IDs and webhook path: importing it never replaces the other website demo.

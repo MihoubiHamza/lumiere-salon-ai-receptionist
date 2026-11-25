@@ -56,13 +56,15 @@ if (shared.length) ok('shared on purpose (SHARED_CREDENTIALS, account-level only
 
 // 3. builds
 console.log('\n3. Generated workflows');
-const checks = [['tools/build-workflows.js'], ['tools/build-messenger.js'], ['website-demo/build-web-demo.js']];
+const checks = [['tools/build-workflows.js'], ['tools/build-messenger.js'], ['tools/build-instagram.js'], ['website-demo/build-web-demo.js']];
 let buildsOk = true;
 for (const [script] of checks) {
   const r = spawnSync(process.execPath, [path.join(ROOT, script), '--check'], { encoding: 'utf8', cwd: ROOT });
   if (r.status !== 0) { buildsOk = false; bad(script + ' --check failed: ' + (r.stdout + r.stderr).trim().split('\n').slice(-2).join(' | ')); }
 }
-if (buildsOk) ok('builds up to date (WhatsApp + tools + error workflow, Messenger, website demo + site URL)');
+if (buildsOk) ok('builds up to date (WhatsApp + tools + error workflow, Messenger, Instagram, website demo + site URL)');
+if (ENV.INSTAGRAM_WEBHOOK_PATH === ENV.MESSENGER_WEBHOOK_PATH) bad('INSTAGRAM_WEBHOOK_PATH must differ from MESSENGER_WEBHOOK_PATH (each channel has its own webhook)');
+else ok('Instagram has its own webhook path (' + ENV.INSTAGRAM_WEBHOOK_PATH + '); the Messenger webhook is separate');
 
 // 4. what only you can do
 console.log('\n4. Manual steps (cannot be checked offline - tick them yourself, see SETUP.md)');
@@ -74,6 +76,8 @@ for (const m of [
     (shared.length ? ' - the shared ones (' + shared.map((c) => c.name).join(', ') + ') already work for the clinic bots' : ''),
   'n8n environment variables set (salon values, NOT the clinic ones): ' + env.join(', '),
   'Salon WhatsApp Business number on its own Meta app (not the clinic number); webhook not shared with the clinic',
+  '(Instagram) n8n credential "' + ENV.credentials.instagram.name + '" created with id ' + ENV.credentials.instagram.id + ' (Header Auth, Bearer <salon Page token with instagram_manage_messages>) - see INSTAGRAM-SETUP.md',
+  '(Instagram) salon Instagram professional account linked to the salon Facebook Page, on the SALON Meta app (verified to be separate from every clinic app); "Allow access to messages" on; Instagram webhook -> /webhook/' + ENV.INSTAGRAM_WEBHOOK_PATH + ' (Messenger webhook unchanged)',
   'Error workflow, tool workflows, then main workflows imported - all arrive inactive; no clinic workflow selected or edited',
 ]) console.log('  [ ] ' + m);
 

@@ -21,9 +21,14 @@ test('X1 numbers differing only in the operator digit (0555.. vs 0655..) are dif
   ]);
   assert.ok(/^NOT_FOUND/.test(rs[0].result), 'other patient cancelled it: ' + rs[0].result);
   assert.ok(/^NOT_FOUND/.test(rs[1].result), 'other patient saw it: ' + rs[1].result);
-  assert.ok(/^NOT_FOUND/.test(rs[2].result), rs[2].result);
+  assert.ok(/^NEED_STAFF/.test(rs[2].result), rs[2].result);
   assert.strictEqual(events(env).length, 1);
-  const [own] = await runAll(env, [() => H.callConfirmed(env, 'cancel', cancel('213999999999', '10:00', { booked_phone_number: '0555112233' }))]);
+  // Even the exact right number, typed from another chat, is never proof of ownership (was: SUCCESS).
+  const [typed] = await runAll(env, [() => H.callConfirmed(env, 'cancel', cancel('213999999999', '10:00', { booked_phone_number: '0555112233' }))]);
+  assert.ok(/^NEED_STAFF/.test(typed.result), typed.result);
+  assert.strictEqual(events(env).filter((e) => e.status !== 'cancelled').length, 1);
+  // The real owner (the verified sender 213555112233) still can.
+  const [own] = await runAll(env, [() => H.callConfirmed(env, 'cancel', cancel('213555112233', '10:00'))]);
   assert.ok(/^SUCCESS/.test(own.result), own.result);
 });
 

@@ -84,7 +84,50 @@ function createEngine(CFG, CONF) {
   }
   // 64-bit non-reversible key: lock objects never store raw phone numbers.
   const kHash = (s) => fnv(s) + fnv('lumiere|' + s);
-  const chatLockIdFor = (chatId) => CFG.CHAT_LOCK_PREFIX + kHash('chat:' + normPhone(chatId));
+
+  // ---------------------------------------------------------------- customer keys
+  // A customer is identified by a CHANNEL-AWARE key, never by bare digits:
+  //   wa:<phone>                          WhatsApp (the verified number)
+  //   fb:<page_id>:<page_scoped_id>       Facebook Messenger
+  //   ig:<instagram_account_id>:<igsid>   Instagram Direct
+  // The key is separate from the customer's real mobile number (Messenger and
+  // Instagram never reveal one). Two keys of different channels or accounts can
+  // never be equal, so chat locks, confirmation records, sessions and appointment
+  // ownership are never shared across channels, even if two numeric ids coincide.
+  // A value without ':' is a legacy digits-only id (website demo session ids, and
+  // old callers): it keeps its previous meaning (a phone number).
+  // wa: keys keep the exact pre-key derivations (same lock object, same identity
+  // hash, same "Phone: <digits>" owner field), so existing WhatsApp state stays valid.
+  const KEY_RE = /^(fb|ig):(\d{5,25}):(\d{5,25})$/;
+  function customerOf(v) {
+    const s = String(v == null ? '' : v).trim();
+    if (!s) return null;
+    if (s.indexOf(':') < 0) { const p = normPhone(s); return p.length >= 6 ? { ch: 'legacy', key: '', phone: p, seed: p } : null; }
+    const w = /^wa:(\d{6,20})$/.exec(s);
+    // Same lower bound as the legacy chat lock (6 digits: a few countries have very short
+    // numbers); identity() still needs 9+ digits before any appointment can be touched.
+    if (w) { const p = normPhone(w[1]); return p.length >= 6 && p.length <= 15 ? { ch: 'wa', key: 'wa:' + p, phone: p, seed: p } : null; }
+    const m = KEY_RE.exec(s);
+    return m ? { ch: m[1], key: s, acct: m[2], sid: m[3], phone: '', seed: s } : null;
+  }
+  const isChannelKey = (cu) => !!cu && (cu.ch === 'fb' || cu.ch === 'ig');
+  // The customer of a tool call: customer_key when the caller sends one (WhatsApp,
+  // Messenger, Instagram), otherwise the legacy phone_number. A key that is present
+  // but malformed, or a wa: key that disagrees with phone_number, fails closed.
+  function customerCtx(c) {
+    const raw = String((c && c.customer_key) == null ? '' : c.customer_key).trim();
+    if (!raw) return customerOf(c && c.phone_number) || { error: 'none' };
+    const cu = customerOf(raw);
+    if (!cu || cu.ch === 'legacy') return { error: 'bad_key' };
+    if (cu.ch === 'wa' && String((c && c.phone_number) == null ? '' : c.phone_number).trim() && normPhone(c.phone_number) !== cu.phone) return { error: 'key_mismatch' };
+    return cu;
+  }
+  const chatLockIdFor = (v) => { const cu = customerOf(v); return cu ? CFG.CHAT_LOCK_PREFIX + kHash('chat:' + cu.seed) : null; };
+  // Owner field written at the very START of a Messenger / Instagram appointment
+  // description ("Customer: ig:<acct>:<igsid>. Notes: ..."). Anchored, so text the
+  // AI writes into the notes can never claim or change the owner.
+  const OWNER_RE = /^\s*Customer:\s*((?:fb|ig):\d{5,25}:\d{5,25})(?=[.\s]|$)/;
+  function ownerKeyOf(ev) { const m = OWNER_RE.exec((ev && ev.description) || ''); return m ? m[1] : ''; }
   function randId(rnd, prefix, n) {
     let s = prefix || '';
     for (let i = 0; i < (n || 24); i++) s += B32[Math.floor(rnd() * 32) % 32];
@@ -140,8 +183,15 @@ function createEngine(CFG, CONF) {
   // Trust ONLY the structured "Phone: <digits>" field (written by the bot) and
   // compare the full normalized number. Events without that field (created by
   // staff by hand) fall back to finding the 9-digit national number in the text.
+  // A Messenger / Instagram appointment ("Customer: <key>" owner field) belongs ONLY
+  // to that exact key: never to a phone number, another Page or account, or the
+  // other channel. A channel key never owns an event without that field (legacy or
+  // staff-made events are phone-owned).
   function phoneMatches(ev, idn) {
-    if (!ev || !idn || !idn.phone) return false;
+    if (!ev || !idn) return false;
+    const owner = ownerKeyOf(ev);
+    if (idn.ck) return !!owner && owner === idn.ck;
+    if (owner || !idn.phone) return false;
     const m = /Phone:\s*\+?(\d+)/i.exec(ev.description || '');
     if (m) return normPhone(m[1]) === idn.phone;
     const blob = digits((ev.description || '') + ' ' + (ev.summary || ''));
@@ -201,21 +251,29 @@ function createEngine(CFG, CONF) {
 
   // ---------------------------------------------------------------- identity
   const idnOf = (phone, via, nameGiven) => ({ phone, tail: tail9(phone), k: kHash('p:' + phone), via, nameGiven });
+  // Messenger / Instagram identity: the channel key only (no phone, no digit-tail fallback).
+  const keyIdnOf = (cu, via, nameGiven) => ({ ck: cu.key, ch: cu.ch, phone: '', tail: '', k: kHash('ck:' + cu.key), via, nameGiven });
+  const BAD_KEY = () => R('ERROR', 'ERROR: The customer could not be identified by the system (invalid customer key), so NOTHING was changed. Apologize briefly and call Escalate_to_Staff.');
+  // OWNERSHIP RULE: the only identity is the VERIFIED sender of this conversation
+  // (customer_key / phone_number, set by the server from Meta's webhook). A phone
+  // number or a name the customer TYPES is never proof that an appointment is
+  // theirs. A request about an appointment booked from another number, channel or
+  // person is refused BEFORE any calendar read (nothing found, nothing revealed,
+  // nothing changed) and goes to a team member. booked_phone_number is kept in the
+  // sub-workflow contract only so that such a request fails closed.
+  const NEED_STAFF = () => R('NEED_STAFF', 'NEED_STAFF: This conversation can only see and change the appointments booked from this same conversation. A phone number or a name the customer types is never proof that an appointment is theirs, so NOTHING was searched, shown or changed. Tell the customer plainly that you can only manage appointments booked from here, that they can also manage it from the number or conversation it was booked with, and call Escalate_to_Staff so a team member can help. Never confirm or deny that an appointment exists under another number or name.');
   function identity(c) {
-    const chat = normPhone(c.phone_number);
-    const bookedRaw = String(c.booked_phone_number == null ? '' : c.booked_phone_number).trim();
+    const cu = customerCtx(c);
+    if (cu.error && cu.error !== 'none') return { error: BAD_KEY() };
+    if (String(c.booked_phone_number == null ? '' : c.booked_phone_number).trim()) return { error: NEED_STAFF() };
+    const chat = cu.error ? '' : cu.phone;
     const name = String(c.patient_name == null ? '' : c.patient_name).trim();
-    if (bookedRaw) {
-      const b = normPhone(bookedRaw);
-      if (b.length < 11 || b.length > 15) {
-        return { error: R('INVALID_INPUT', 'INVALID_INPUT: booked_phone_number does not look like a valid phone number. Ask the customer to resend the exact number the appointment was booked with, including the country code.') };
-      }
-      return idnOf(b, 'booked', name.length >= 3);
-    }
+    if (isChannelKey(cu)) return keyIdnOf(cu, 'chat', name.length >= 3);
     if (chat.length >= 9) return idnOf(chat, 'chat', name.length >= 3);
     return { error: R('NOT_FOUND', 'NOT_FOUND: No usable phone number to identify the customer - nothing was changed.') };
   }
-  const NEED_BOOKED_PHONE = 'NEED_BOOKED_PHONE: No appointment is registered under the current WhatsApp number for that date/time, and a customer name alone can never be used to find or change an appointment (privacy protection). If the customer says it was booked from a different phone number, ask for that exact number and call this tool again with booked_phone_number filled in. If they do not know it, call Escalate_to_Staff.';
+  // Nothing of THIS customer at that date/time. Booked elsewhere -> staff, never a search by number or name.
+  const ELSEWHERE = ' If the customer says it was booked from a different phone number, another channel or by someone else, do not search for it and never ask for that number: call Escalate_to_Staff (NEED_STAFF).';
 
   // ---------------------------------------------------------------- results
   function R(status, message, extra) { return Object.assign({ status, message }, extra || {}); }
@@ -392,13 +450,17 @@ function createEngine(CFG, CONF) {
     }
     if (en - st > CFG.APPT_MAX_MIN * 60000) return DONE(s, R('INVALID_INPUT', 'INVALID_INPUT: The appointment is longer than ' + CFG.APPT_MAX_MIN + ' minutes, which is not allowed. Use the service duration from the salon information.'));
     const summary = cleanSummary(c.summary);
-    const phone = normPhone(c.phone_number);
+    const cu = customerCtx(c);
+    if (cu.error && cu.error !== 'none') return DONE(s, BAD_KEY());
+    const phone = cu.error ? '' : cu.phone;
     if (!summary) return DONE(s, R('INVALID_INPUT', 'INVALID_INPUT: The appointment title (customer name + service) is missing. Collect it and call this tool again.'));
-    if (phone.length < 9) return DONE(s, R('INVALID_INPUT', 'INVALID_INPUT: No valid contact phone number for this booking - nothing was booked.'));
+    if (!isChannelKey(cu) && phone.length < 9) return DONE(s, R('INVALID_INPUT', 'INVALID_INPUT: No valid contact phone number for this booking - nothing was booked.'));
     const rule = slotRule(st, now, 'booked') || endRule(st, en, 'booked');
     if (rule) return DONE(s, rule);
-    const idn = idnOf(phone, 'chat', false);
-    s.b = { s: st, e: en, summary, phone, notes: String(c.notes == null ? '' : c.notes), idn, k: idn.k, sh: fnv(normName(summary)), ins: 0, chk: 0, rb: 0, gone: [] };
+    const idn = isChannelKey(cu) ? keyIdnOf(cu, 'chat', false) : idnOf(phone, 'chat', false);
+    // Owner field: "Customer: <key>" for Messenger / Instagram, "Phone: <digits>" for WhatsApp (unchanged).
+    const hdr = isChannelKey(cu) ? 'Customer: ' + cu.key : 'Phone: ' + phone;
+    s.b = { s: st, e: en, summary, phone, hdr, notes: String(c.notes == null ? '' : c.notes), idn, k: idn.k, sh: fnv(normName(summary)), ins: 0, chk: 0, rb: 0, gone: [] };
     return lockStart(s, 'B.list', now);
   };
   H['B.list'] = (s) => { const a = dayStart(s.b.s); return listStart(s, 'day', a, a + DAY, 'B.decide'); };
@@ -439,7 +501,7 @@ function createEngine(CFG, CONF) {
   function bookBody(b) {
     return {
       id: b.id, summary: b.summary,
-      description: 'Phone: ' + b.phone + '. Notes: ' + b.notes,
+      description: (b.hdr || 'Phone: ' + b.phone) + '. Notes: ' + b.notes,
       start: { dateTime: isoLocal(b.s), timeZone: CFG.TIMEZONE },
       end: { dateTime: isoLocal(b.e), timeZone: CFG.TIMEZONE },
     };
@@ -493,7 +555,7 @@ function createEngine(CFG, CONF) {
   };
 
   // ================================================================ RESCHEDULE
-  const RS_NOT_FOUND = 'NOT_FOUND: No appointment found matching that phone number and old date/time - cannot reschedule.';
+  const RS_NOT_FOUND = 'NOT_FOUND: No appointment of this customer found at that old date/time - cannot reschedule.' + ELSEWHERE;
   H['S.start'] = (s, r, now) => {
     const c = s.ctx;
     const od = parseYmd(c.old_appointment_date);
@@ -507,7 +569,7 @@ function createEngine(CFG, CONF) {
     const newS = localMs(nd.y, nd.mo, nd.d, nt.h, nt.mi);
     const rule = slotRule(newS, now, 'changed');
     if (rule) return DONE(s, rule);
-    s.x = { odate: od.text, ot: ot ? ot.text : '', newS, idn, newSummary: cleanSummary(c.new_summary), newDesc: String(c.new_description == null ? '' : c.new_description).trim(), phone: digits(c.phone_number), relist: 0, put: 0, rb: 0 };
+    s.x = { odate: od.text, ot: ot ? ot.text : '', newS, idn, newSummary: cleanSummary(c.new_summary), newDesc: String(c.new_description == null ? '' : c.new_description).trim(), phone: digits(c.phone_number), ck: idn.ck || '', relist: 0, put: 0, rb: 0 };
     return lockStart(s, 'S.list', now);
   };
   H['S.list'] = (s) => { const d = parseYmd(s.x.odate); const a = localMs(d.y, d.mo, d.d); return listStart(s, 'old', a, a + DAY, 'S.list2'); };
@@ -526,7 +588,7 @@ function createEngine(CFG, CONF) {
     x.id = cands[0].id;
     return GOTO(s, 'S.fresh');
   };
-  H['S.none'] = (s) => finish(s, s.x.idn.via === 'chat' && s.x.idn.nameGiven ? R('NEED_BOOKED_PHONE', NEED_BOOKED_PHONE) : R('NOT_FOUND', RS_NOT_FOUND));
+  H['S.none'] = (s) => finish(s, R('NOT_FOUND', RS_NOT_FOUND));
   // Duplicate of a reschedule we already did: confirm with a strong read first.
   H['S.dup'] = (s) => HTTP(s, 'S.dupR', { method: 'GET', url: evUrl(CFG.CALENDAR_ID, s.x.dup) });
   H['S.dupR'] = (s, r, now, rnd) => {
@@ -573,12 +635,22 @@ function createEngine(CFG, CONF) {
     b.start = start; b.end = end; b.summary = summary; b.description = description; b.status = 'confirmed';
     return b;
   }
+  // A new description keeps the appointment's owner (a caller only ever reaches its
+  // own appointments): a Messenger / Instagram caller keeps the event's existing
+  // "Customer:" field; a WhatsApp caller writes "Phone: <its own digits>" as before.
+  function ownerHeader(x) {
+    if (!x.ck) return 'Phone: ' + x.phone;
+    const o = ownerKeyOf(x.full);
+    if (o) return 'Customer: ' + o;
+    const m = /^\s*Phone:\s*\+?(\d+)/i.exec((x.full && x.full.description) || '');
+    return m ? 'Phone: ' + m[1] : 'Customer: ' + x.ck;
+  }
   function newBody(s) {
     const x = s.x;
     return eventBody(x.full,
       { dateTime: isoLocal(x.newS), timeZone: CFG.TIMEZONE }, { dateTime: isoLocal(x.newE), timeZone: CFG.TIMEZONE },
       x.newSummary || x.full.summary,
-      x.newDesc ? 'Phone: ' + x.phone + '. Notes: ' + x.newDesc : x.full.description);
+      x.newDesc ? ownerHeader(x) + '. Notes: ' + x.newDesc : x.full.description);
   }
   H['S.put'] = (s) => { s.x.put++; return HTTP(s, 'S.putR', { method: 'PUT', url: evUrl(CFG.CALENDAR_ID, s.x.id), headers: { 'If-Match': s.x.full.etag }, body: newBody(s) }); };
   H['S.putR'] = (s, r, now, rnd) => {
@@ -638,7 +710,7 @@ function createEngine(CFG, CONF) {
   };
 
   // ================================================================ CANCEL
-  const CN_NOT_FOUND = 'NOT_FOUND: No appointment found matching that phone number and date/time.';
+  const CN_NOT_FOUND = 'NOT_FOUND: No appointment of this customer found at that date/time.' + ELSEWHERE;
   H['C.start'] = (s, r, now) => {
     const c = s.ctx;
     const d = parseYmd(c.appointment_date);
@@ -663,7 +735,7 @@ function createEngine(CFG, CONF) {
     x.id = cands[0].id;
     return GOTO(s, 'C.fresh');
   };
-  H['C.none'] = (s) => finish(s, s.c.idn.via === 'chat' && s.c.idn.nameGiven ? R('NEED_BOOKED_PHONE', NEED_BOOKED_PHONE) : R('NOT_FOUND', CN_NOT_FOUND));
+  H['C.none'] = (s) => finish(s, R('NOT_FOUND', CN_NOT_FOUND));
   // Duplicate of a cancellation we already did: confirm it is really gone first.
   H['C.dup'] = (s) => HTTP(s, 'C.dupR', { method: 'GET', url: evUrl(CFG.CALENDAR_ID, s.c.dup.i) });
   H['C.dupR'] = (s, r, now, rnd) => {
@@ -732,7 +804,8 @@ function createEngine(CFG, CONF) {
   // customer's raw next message - can apply it, and only if every check below
   // passes. The record is used up (CAS) BEFORE the calendar write, so it can
   // never be replayed. One record per customer: a new proposal replaces it.
-  const chatLock = (s) => chatLockIdFor(s.ctx.phone_number);
+  // The customer's own chat lock object (the same one the main workflow takes for this customer).
+  const chatLock = (s) => { const cu = customerCtx(s.ctx); return cu.error ? null : CFG.CHAT_LOCK_PREFIX + kHash('chat:' + cu.seed); };
   const fpOf = (ev) => fnv(JSON.stringify([String((ev && ev.summary) || ''), String((ev && ev.description) || '')]));
   function svcOf(ev) { const m = /Service:\s*([^|\n]+)/i.exec((ev && ev.description) || ''); return m ? m[1].replace(/[.\s]+$/, '').trim().slice(0, 80) : ''; }
   const notesAdd = (n, now, t) => (n || []).concat([{ at: now, t: String(t).slice(0, 300) }]).slice(-(CFG.CONFIRM_NOTES_MAX || 4));
@@ -753,7 +826,7 @@ function createEngine(CFG, CONF) {
       ' and makes the change only after their explicit yes in their next message. Never say it is done, and do not ask for the confirmation yourself.' + (CONF ? ' ' + CONF.mark(CONF.pub(rec)) : ''), { confirm: CONF ? CONF.pub(rec) : { id: rec.id, act: rec.act } });
   }
   function proposeStart(s, rec, now, rnd) {
-    if (normPhone(s.ctx.phone_number).length < 6) return finish(s, resError(s, 'no customer chat for the confirmation'));
+    if (!chatLock(s)) return finish(s, resError(s, 'no customer chat for the confirmation'));
     s.P = { rec: Object.assign(rec, { id: randId(rnd, 'cf', 20), at: now, exp: now + (CFG.CONFIRM_TTL_MS || 600000), pm: String(s.ctx.chat_msg_id == null ? '' : s.ctx.chat_msg_id) }), boots: 0, n: 0 };
     return GOTO(s, 'P.get');
   }
@@ -789,7 +862,7 @@ function createEngine(CFG, CONF) {
   H['X.start'] = (s) => {
     s.exec = true;
     if (!CONF) return DONE(s, invalid('no_classifier'));
-    if (normPhone(s.ctx.phone_number).length < 6) return DONE(s, invalid('no_customer'));
+    if (!chatLock(s)) return DONE(s, invalid('no_customer'));
     s.X = { n: 0 };
     return GOTO(s, 'X.get');
   };
@@ -842,7 +915,7 @@ function createEngine(CFG, CONF) {
       return GOTO(s, 'C.del');
     }
     s.x = { id: rec.ev, full: ev, orig: { summary: ev.summary, description: ev.description, start: ev.start, end: ev.end, s: rec.os, e: rec.oe },
-      newS: rec.ns, newE: rec.ne, idn: { k: rec.k }, newSummary: rec.nsum || '', newDesc: rec.ndesc || '', phone: digits(s.ctx.phone_number), odate: ymd(rec.os), ot: hm(rec.os), relist: 9, put: 0, rb: 0 };
+      newS: rec.ns, newE: rec.ne, idn: { k: rec.k }, newSummary: rec.nsum || '', newDesc: rec.ndesc || '', phone: digits(s.ctx.phone_number), ck: isChannelKey(customerCtx(s.ctx)) ? customerCtx(s.ctx).key : '', odate: ymd(rec.os), ot: hm(rec.os), relist: 9, put: 0, rb: 0 };
     const a = dayStart(rec.ns);
     return listStart(s, 'new', a, a + DAY, 'X.slot');
   };
@@ -864,12 +937,13 @@ function createEngine(CFG, CONF) {
   const chatLockId = (s) => chatLockIdFor(s.ctx.chatId);
   // What the main workflow needs from this customer's lock object at the start of
   // a message: the pending confirmation (if any), recent system notes and language.
-  const convo = (st) => ({ pending: st.pc || null, notes: st.n || [], lang: st.lg || '' });
+  // lastTs: timestamp of this customer's previous processed message (0 = first contact).
+  const convo = (st) => ({ pending: st.pc || null, notes: st.n || [], lang: st.lg || '', lastTs: st.lp || 0 });
   const qKey = (w) => [w.ts || 0, w.r || 0, w.t];
   function qCmp(a, b) { const x = qKey(a), y = qKey(b); for (let i = 0; i < 3; i++) { if (x[i] < y[i]) return -1; if (x[i] > y[i]) return 1; } return 0; }
 
   H['CA.start'] = (s) => {
-    if (digits(s.ctx.chatId).length < 6 || !s.ctx.msgId) return DONE(s, R('ERROR', 'chat lock: missing chatId or msgId'));
+    if (!chatLockIdFor(s.ctx.chatId) || !s.ctx.msgId) return DONE(s, R('ERROR', 'chat lock: missing chatId or msgId'));
     s.q = { polls: 0, boots: 0 };
     return GOTO(s, 'CA.get');
   };
@@ -1010,7 +1084,7 @@ function createEngine(CFG, CONF) {
   }
   return {
     init, step,
-    _t: { parseDateTime, parseYmd, parseHm, fmtLocal, isoLocal, localMs, ymd, hm, slotRule, endRule, identity, busyView, matchView, phoneMatches, allDayBlock, normPhone, chatLockId: chatLockIdFor, cls, lp },
+    _t: { parseDateTime, parseYmd, parseHm, fmtLocal, isoLocal, localMs, ymd, hm, slotRule, endRule, identity, busyView, matchView, phoneMatches, allDayBlock, normPhone, chatLockId: chatLockIdFor, customerOf, customerCtx, ownerKeyOf, cls, lp },
   };
 }
 if (typeof module !== 'undefined' && module.exports) module.exports = { createEngine };

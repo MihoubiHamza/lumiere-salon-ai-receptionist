@@ -1,7 +1,7 @@
 # Lumière Hair & Beauty Studio — AI Receptionist (demo)
 
 Yasmine, the AI receptionist, set up for **Lumière Hair & Beauty Studio**, a fictional, modern hair and beauty salon.
-She answers customers on **WhatsApp**, **Facebook Messenger** and the **website chat**, explains services, prices and durations, and books, reschedules and cancels appointments in Google Calendar. She speaks **English, French, Spanish and Arabic**.
+She answers customers on **WhatsApp**, **Facebook Messenger**, **Instagram Direct** (text only) and the **website chat**, explains services, prices and durations, and books, reschedules and cancels appointments in Google Calendar. She speaks **English, French, Spanish and Arabic**.
 
 All salon data (address, phone, prices, durations, policies, opening hours) is **fictional demo data**.
 
@@ -13,6 +13,7 @@ All salon data (address, phone, prices, durations, policies, opening hours) is *
 | `Book / Cancel / Reschedule Appointment - Deterministic (Lumiere).json`, `Find Customer Appointments - …`, `Check Availability - …` | The 5 calendar tool sub-workflows (shared by WhatsApp and Messenger) |
 | `Salon Error Alert (Lumiere).json` | Error workflow: WhatsApp alert to staff when an execution crashes |
 | `Lumiere Messenger AI Agent.json` | Messenger workflow, **generated** by `tools/build-messenger.js` (see `MESSENGER-SETUP.md`) |
+| `Lumiere Instagram AI Agent.json` | Instagram Direct workflow, **generated** by `tools/build-instagram.js` from the Messenger build (see `INSTAGRAM-SETUP.md`) |
 | `website-demo/` | Website demo workflows (generated) and the website `site/index.html` (see `website-demo/README.md`) |
 | `lumiere.config.js` | **The salon's environment**: Google Calendar and Sheet IDs, n8n credential names, `LUMIERE_*` environment variable names, workflow IDs, webhook paths, timezone, website demo resources |
 | `SETUP.md` | **Step-by-step setup guide and final pre-import checklist** |
@@ -30,7 +31,7 @@ All salon data (address, phone, prices, durations, policies, opening hours) is *
 2. Rebuild everything:
 
 ```powershell
-node tools/build-workflows.js; node tools/build-messenger.js; node website-demo/build-web-demo.js; node tools/build-salon-sheet.js
+node tools/build-workflows.js; node tools/build-messenger.js; node tools/build-instagram.js; node website-demo/build-web-demo.js; node tools/build-salon-sheet.js
 ```
 
 3. Run the tests, then re-import the changed workflows in n8n:
@@ -52,8 +53,9 @@ node tools/preflight.js
 The salon uses only its own resources, so it can run on the same n8n instance as other bots:
 
 - Own Google Calendars (salon + public demo), own Google Sheet (tabs referenced by name), all set in `lumiere.config.js`. The placeholders fail closed until you fill them.
-- Own WhatsApp and Messenger credentials (`LUMIERE - …`) and own environment variables (`LUMIERE_*`). No `CLINIC_*` variable, no other bot's staff number. The account-level Google, OpenRouter and Cohere credentials are **shared on purpose** with the older bots on the instance (`SHARED_CREDENTIALS` in `lumiere.config.js`); WhatsApp and Messenger can never be shared.
-- Own workflow IDs (`lum…`, `lumWebDemo…`), node IDs, webhook IDs, webhook paths (`lumiere-messenger`, `lumiere-website-demo`) and calendar lock objects. Importing creates new workflows and can never replace another bot's workflow or the other website demo.
+- Own WhatsApp, Messenger and Instagram credentials (`LUMIERE - …`) and own environment variables (`LUMIERE_*`). No `CLINIC_*` variable, no other bot's staff number. The account-level Google, OpenRouter and Cohere credentials are **shared on purpose** with the older bots on the instance (`SHARED_CREDENTIALS` in `lumiere.config.js`); WhatsApp, Messenger and Instagram can never be shared.
+- **Channel-aware customer keys** (`wa:<number>`, `fb:<page_id>:<psid>`, `ig:<instagram_account_id>:<igsid>`). Chat locks, pending confirmations, AI memory, pause rows and appointment ownership are keyed by them, so channels, Pages and accounts never share a customer even when two numeric IDs are identical. WhatsApp keeps its previous lock objects and its `Phone:` owner field, so existing WhatsApp state stays valid.
+- Own workflow IDs (`lum…`, `lumWebDemo…`), node IDs, webhook IDs, webhook paths (`lumiere-messenger`, `lumiere-instagram`, `lumiere-website-demo`) and calendar lock objects. Importing creates new workflows and can never replace another bot's workflow or the other website demo.
 - All workflows are exported **inactive**.
 - `tests/isolation.test.js` and `tools/preflight.js` check all of this. They scan the other bots' folders next to this project read-only.
 
@@ -61,7 +63,7 @@ One thing the files cannot enforce: the salon needs its **own Meta app and Whats
 
 ## Testing the demo
 
-**Automated (no n8n needed):** `cd tests && npm test` runs all 12 suites (162 tests: WhatsApp, tools, concurrency, Messenger, website demo, website page, resource isolation). They run the real workflow JSON in an n8n emulator with a fake Google Calendar and a scripted AI.
+**Automated (no n8n needed):** `cd tests && npm test` runs all 14 suites (228 tests: WhatsApp, tools, concurrency, Messenger, Instagram, appointment authorization, website demo, website page, resource isolation). They run the real workflow JSON in an n8n emulator with a fake Google Calendar and a scripted AI.
 
 **Website (live AI):** follow the test script in `website-demo/README.md`. Use the suggested questions on the chat chips:
 - "Hi! I'd like to book a haircut for tomorrow."
@@ -83,6 +85,12 @@ One thing the files cannot enforce: the salon needs its **own Meta app and Whats
 
 ## Known limits (honest list)
 
+- **Instagram is text only and not tested against Meta yet:**
+  - voice messages and attachments get a friendly "please type" reply;
+  - replies are only sent inside Meta's 24-hour window, and staff must answer handed-off customers within 24 h (the HUMAN_AGENT tag is not used);
+  - real customers need Advanced Access (App Review + Business Verification);
+  - see `INSTAGRAM-SETUP.md`.
+- **Messenger bookings made before the customer-key update** (`Phone: <Messenger ID>`, test data only) are no longer linked to a conversation; staff handle them by hand.
 - **One shared calendar:** each time slot holds one appointment. There is no per-stylist availability; a stylist preference is only written in the booking notes.
 - **Voice notes are supported in ONE language only:** Cohere's transcription API needs the language up front and has no automatic detection, so every voice note is transcribed in `VOICE_LANGUAGE` (Spanish by default). The AI is told this and asks customers who use another language to type. Text messages work in all four languages. No voice language has been verified with live audio yet. Multi-language voice would need a different transcription service; the disabled `Groq HTTP Request (fallback, disabled)` node (Whisper) is an option, but it is not wired or tested.
 - **Messenger voice clips** are MP4/AAC, which Cohere's documentation does not list as a supported format.
