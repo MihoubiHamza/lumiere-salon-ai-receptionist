@@ -389,8 +389,21 @@ function createEngine(CFG, CONF) {
     const priceText = (from ? 'from ' : '') + svcPrice(price);
     const text = 'Services: ' + parts.join(' + ') + ' = ' + minutes + ' minutes in total (calculated by the system from the price list); starting price ' + priceText + '.';
     if (minutes > CFG.APPT_MAX_MIN) return { error: R('TOO_LONG', 'TOO_LONG: ' + text + ' That is more than the maximum of ' + CFG.APPT_MAX_MIN + ' minutes for one appointment, so nothing was checked or booked. Explain this to the customer and offer to book the services as two separate appointments (each one checked and booked on its own), or to choose fewer services.') };
-    return { keys, counted, included, minutes, label, priceText, text };
+    return { keys, counted, included, minutes, label, labels: svcLabels(counted), priceText, text };
   }
+  // The services' names in the four reply languages (the system's confirmation texts use them).
+  function svcLabels(keys) {
+    const idx = svcIndex(); const o = {};
+    for (const [l, f] of [['en', 'name'], ['fr', 'name_fr'], ['es', 'name_es'], ['ar', 'name_ar']]) o[l] = keys.filter((k) => idx.byKey[k]).map((k) => idx.byKey[k][f] || idx.byKey[k].name).join(' + ').slice(0, 160);
+    return o;
+  }
+  // The service line the booking system wrote into an appointment (right after the owner field).
+  const SVC_LINE_RE = /^\s*(?:Phone:\s*\+?\d+|Customer:\s*(?:fb|ig):\d{5,25}:\d{5,25})\.\s+(Service: [^|\n]+ \| Keys: ([a-z0-9_,]+) \| Duration: (\d+) min)\.\s/;
+  function svcLineOf(ev) { const m = SVC_LINE_RE.exec((ev && ev.description) || ''); return m ? { line: m[1], keys: m[2].split(',').filter(Boolean), minutes: Number(m[3]) } : null; }
+  const countedOf = (keys) => { const r = resolveServices(keys); return r.error ? keys : r.counted; };
+  const resolveSame = (curKeys, counted) => countedOf(curKeys).slice().sort().join() === counted.slice().sort().join();
+  // The free-text notes of an appointment (everything after the first "Notes: ").
+  function notesOf(ev) { const d = String((ev && ev.description) || ''); const i = d.indexOf('Notes: '); return i >= 0 ? d.slice(i + 7) : ''; }
   // The structured service field the booking system writes right after the owner field.
   function svcFields(sv) { return 'Service: ' + sv.label + ' | Keys: ' + sv.keys.join(',') + ' | Duration: ' + sv.minutes + ' min'; }
 
@@ -661,10 +674,17 @@ function createEngine(CFG, CONF) {
     if (!nd || !nt) return DONE(s, R('INVALID_INPUT', 'INVALID_INPUT: The new appointment date and/or time is missing or invalid. Ask the customer to state both an exact new date and an exact new time, then call this tool again.'));
     const idn = identity(c);
     if (idn.error) return DONE(s, idn.error);
+    // A service change: the new length comes ONLY from the catalogue (never from the AI).
+    const nkRaw = c.new_service_keys == null ? '' : c.new_service_keys;
+    let sv = null;
+    if (Array.isArray(nkRaw) ? nkRaw.length : String(nkRaw).trim()) {
+      sv = resolveServices(nkRaw);
+      if (sv.error) return DONE(s, R(sv.error.status, sv.error.message.replace(/(n|N)othing was checked or booked/, '$1othing was checked or changed')));
+    }
     const newS = localMs(nd.y, nd.mo, nd.d, nt.h, nt.mi);
     const rule = slotRule(newS, now, 'changed');
     if (rule) return DONE(s, rule);
-    s.x = { odate: od.text, ot: ot ? ot.text : '', newS, idn, newSummary: cleanSummary(c.new_summary), newDesc: String(c.new_description == null ? '' : c.new_description).trim(), phone: digits(c.phone_number), ck: idn.ck || '', relist: 0, put: 0, rb: 0 };
+    s.x = { odate: od.text, ot: ot ? ot.text : '', newS, idn, sv: sv ? { keys: sv.keys, counted: sv.counted, minutes: sv.minutes, label: sv.label, labels: sv.labels, text: sv.text, fields: svcFields(sv) } : null, newSummary: cleanSummary(c.new_summary), newDesc: String(c.new_description == null ? '' : c.new_description).trim(), phone: digits(c.phone_number), ck: idn.ck || '', relist: 0, put: 0, rb: 0 };
     return lockStart(s, 'S.list', now);
   };
   H['S.list'] = (s) => { const d = parseYmd(s.x.odate); const a = localMs(d.y, d.mo, d.d); return listStart(s, 'old', a, a + DAY, 'S.list2'); };
@@ -709,15 +729,22 @@ function createEngine(CFG, CONF) {
       if (!still) { if (x.relist++ < 2) return GOTO(s, 'S.list'); return finish(s, R('NOT_FOUND', RS_NOT_FOUND)); }
       x.full = ev;
       if (!x.orig) x.orig = { summary: ev.summary, description: ev.description, start: ev.start, end: ev.end, s: st, e: evEnd(ev) };
-      const dur = x.orig.e - x.orig.s > 0 ? x.orig.e - x.orig.s : CFG.APPT_DEFAULT_MIN * 60000;
+      // Same services as booked (and the same length): not a service change.
+      const cur = svcLineOf(ev);
+      if (x.sv && cur && cur.minutes === x.sv.minutes && cur.minutes * 60000 === x.orig.e - x.orig.s &&
+        resolveSame(cur.keys, x.sv.counted)) x.sv = null;
+      const dur = x.sv ? x.sv.minutes * 60000 : x.orig.e - x.orig.s > 0 ? x.orig.e - x.orig.s : CFG.APPT_DEFAULT_MIN * 60000;
       x.newE = x.newS + dur;
       const late = endRule(x.newS, x.newE, 'changed');
       if (late) return finish(s, late);
+      // The WHOLE new length is checked (the appointment itself does not block its own new time).
       const hit = busyView(s.lists.new, s.L.held.st.j).filter((b) => b.id !== ev.id).find((b) => overlaps(x.newS, x.newE, b.s, b.e));
       if (hit && hit.allDay) return finish(s, R('CLOSED_DAY', 'CLOSED_DAY: ' + ymd(x.newS) + ' is marked as unavailable on the salon calendar (for example a holiday or the salon is closed). Nothing was changed. Ask the customer for a different day.'));
-      if (hit) return finish(s, R('CONFLICT', 'CONFLICT: The new time slot is already booked (another appointment at ' + hm(hit.s) + '). Ask the customer to choose a different time, then call Reschedule_Appointment again with the new choice.'));
-      // Never move it yet: record what the customer must confirm (confirmation gate).
-      return proposeStart(s, { act: 'reschedule', ev: ev.id, os: x.orig.s, oe: x.orig.e, fp: fpOf(ev), ns: x.newS, ne: x.newE, nsum: x.newSummary, ndesc: x.newDesc, k: x.idn.k, sum: cleanSummary(ev.summary), svc: svcOf(ev) }, now, rnd);
+      if (hit) return finish(s, R('CONFLICT', 'CONFLICT: The new time slot is already booked (another appointment at ' + hm(hit.s) + ')' + (x.sv ? ' for the whole new length of ' + x.sv.minutes + ' minutes (' + hm(x.newS) + '-' + hm(x.newE) + ')' : '') + '. Nothing was changed - the current appointment stays exactly as it is. Ask the customer to choose a different time, then call Reschedule_Appointment again with the new choice.'));
+      // Never change it yet: record what the customer must confirm (confirmation gate).
+      const rec = { act: 'reschedule', ev: ev.id, os: x.orig.s, oe: x.orig.e, fp: fpOf(ev), ns: x.newS, ne: x.newE, nsum: x.newSummary, ndesc: x.newDesc, k: x.idn.k, sum: cleanSummary(ev.summary), svc: svcOf(ev) };
+      if (x.sv) Object.assign(rec, { nsf: x.sv.fields, nl: x.sv.labels, nm: x.sv.minutes, ol: cur ? svcLabels(countedOf(cur.keys)) : null });
+      return proposeStart(s, rec, now, rnd);
     }
     if (c === 'notfound' || c === 'gone') return finish(s, R('NOT_FOUND', RS_NOT_FOUND));
     if (retryable(c)) return retryOr(s, 'SF', 'S.fresh', now, rnd) || finish(s, resError(s, 'read'));
@@ -740,12 +767,16 @@ function createEngine(CFG, CONF) {
     const m = /^\s*Phone:\s*\+?(\d+)/i.exec((x.full && x.full.description) || '');
     return m ? 'Phone: ' + m[1] : 'Customer: ' + x.ck;
   }
+  const sameTimes = (x) => x.newS === x.orig.s && x.newE === x.orig.e;
+  // The owner field always comes first; then the service line (the new services after a confirmed
+  // service change, otherwise the one already on the appointment); then the notes.
   function newBody(s) {
     const x = s.x;
+    const line = x.newSvc || (svcLineOf(x.full) || {}).line || '';
+    const desc = x.newSvc || x.newDesc ? ownerHeader(x) + '. ' + (line ? line + '. ' : '') + 'Notes: ' + (x.newDesc || notesOf(x.full)) : x.full.description;
     return eventBody(x.full,
       { dateTime: isoLocal(x.newS), timeZone: CFG.TIMEZONE }, { dateTime: isoLocal(x.newE), timeZone: CFG.TIMEZONE },
-      x.newSummary || x.full.summary,
-      x.newDesc ? ownerHeader(x) + '. Notes: ' + x.newDesc : x.full.description);
+      x.newSummary || x.full.summary, desc);
   }
   H['S.put'] = (s) => { s.x.put++; return HTTP(s, 'S.putR', { method: 'PUT', url: evUrl(CFG.CALENDAR_ID, s.x.id), headers: { 'If-Match': s.x.full.etag }, body: newBody(s) }); };
   H['S.putR'] = (s, r, now, rnd) => {
@@ -763,8 +794,18 @@ function createEngine(CFG, CONF) {
       const ev = body(r);
       if (ev.status === 'cancelled') return finish(s, R('NOT_FOUND', RS_NOT_FOUND));
       const st = evStart(ev), en = evEnd(ev);
-      if (st === x.newS && en === x.newE) { x.updated = ev; return GOTO(s, 'S.v0'); } // our write landed
-      if (st === x.orig.s && en === x.orig.e && x.put < 3 && leaseOk(s, now)) { x.full = ev; return GOTO(s, 'S.put'); } // not applied
+      if (!sameTimes(x)) {
+        if (st === x.newS && en === x.newE) { x.updated = ev; return GOTO(s, 'S.v0'); } // our write landed
+        if (st === x.orig.s && en === x.orig.e && x.put < 3 && leaseOk(s, now)) { x.full = ev; return GOTO(s, 'S.put'); } // not applied (a concurrent staff edit of the text is kept)
+      } else {
+        // A change that keeps the same times (e.g. another service of the same length): only the
+        // content tells whether our write landed; anything else is unclear, never "nothing changed".
+        const want = newBody(s);
+        const is = (a, b) => String(a.description || '') === String(b.description || '') && String(a.summary || '') === String(b.summary || '');
+        if (st === x.newS && en === x.newE && is(ev, want)) { x.updated = ev; return GOTO(s, 'S.v0'); }
+        if (st === x.orig.s && en === x.orig.e && is(ev, x.orig) && x.put < 3 && leaseOk(s, now)) { x.full = ev; return GOTO(s, 'S.put'); }
+        return finish(s, resUnknown(s, 'reschedule confirmation'));
+      }
       return finish(s, R('ERROR', 'ERROR: The appointment was changed by someone else while rescheduling, so this request changed NOTHING. Call Find_Patient_Appointments to re-check the current appointment before trying again.'));
     }
     if (c === 'notfound' || c === 'gone') return finish(s, R('NOT_FOUND', RS_NOT_FOUND));
@@ -779,7 +820,9 @@ function createEngine(CFG, CONF) {
   H['S.ok'] = (s, r, now) => {
     const x = s.x;
     s.jadd = [{ o: 'u', i: x.id, s: x.newS, e: x.newE, os: x.orig.s, oe: x.orig.e, k: x.idn.k, at: now }];
-    return finish(s, R('SUCCESS', 'SUCCESS: Rescheduled appointment "' + cleanSummary(x.orig.summary) + '" from ' + fmtLocal(x.orig.s) + ' to ' + fmtLocal(x.newS)));
+    const sl = x.newSvc ? / Service: ([^|]+) \| .* Duration: (\d+) min/.exec(' ' + x.newSvc) : null;
+    return finish(s, R('SUCCESS', 'SUCCESS: Rescheduled appointment "' + cleanSummary(x.orig.summary) + '" from ' + fmtLocal(x.orig.s) + ' to ' + fmtLocal(x.newS) +
+      (sl ? '; services changed to ' + sl[1].trim() + ' (' + sl[2] + ' minutes, ' + hm(x.newS) + '-' + hm(x.newE) + ')' : '')));
   };
   H['S.rb'] = (s) => {
     const x = s.x; x.rb++;
@@ -796,7 +839,7 @@ function createEngine(CFG, CONF) {
     const c = cls(r);
     if (c === 'ok') {
       const ev = body(r);
-      if (evStart(ev) === s.x.orig.s && evEnd(ev) === s.x.orig.e) return finish(s, R('CONFLICT', 'CONFLICT: The new time slot was taken by another booking at the same moment, so the appointment was left at its ORIGINAL time (' + fmtLocal(s.x.orig.s) + '). Ask the customer to choose a different time.'));
+      if (evStart(ev) === s.x.orig.s && evEnd(ev) === s.x.orig.e && (!sameTimes(s.x) || String(ev.description || '') === String(s.x.orig.description || ''))) return finish(s, R('CONFLICT', 'CONFLICT: The new time slot was taken by another booking at the same moment, so the appointment was left at its ORIGINAL time (' + fmtLocal(s.x.orig.s) + '). Ask the customer to choose a different time.'));
       s.x.updated = ev;
       return GOTO(s, 'S.rb');
     }
@@ -906,7 +949,9 @@ function createEngine(CFG, CONF) {
   const notesAdd = (n, now, t) => (n || []).concat([{ at: now, t: String(t).slice(0, 300) }]).slice(-(CFG.CONFIRM_NOTES_MAX || 4));
   const usedAdd = (pu, id) => (pu || []).concat([id]).slice(-(CFG.CONFIRM_USED_MAX || 20));
   function describe(rec) {
-    return rec.act === 'cancel' ? 'cancelling "' + rec.sum + '" on ' + fmtLocal(rec.os) : 'moving "' + rec.sum + '" from ' + fmtLocal(rec.os) + ' to ' + fmtLocal(rec.ns);
+    if (rec.act === 'cancel') return 'cancelling "' + rec.sum + '" on ' + fmtLocal(rec.os);
+    if (rec.nsf) return 'changing "' + rec.sum + '" on ' + fmtLocal(rec.os) + ' to ' + ((rec.nl && rec.nl.en) || 'the new services') + ' (' + rec.nm + ' minutes, ' + fmtLocal(rec.ns) + '-' + hm(rec.ne) + ')';
+    return 'moving "' + rec.sum + '" from ' + fmtLocal(rec.os) + ' to ' + fmtLocal(rec.ns);
   }
   function invalid(reason, extra) {
     return R('CONFIRMATION_INVALID', 'CONFIRMATION_INVALID (' + reason + '): the change was NOT made - nothing was changed.', Object.assign({ reason }, extra || {}));
@@ -937,7 +982,7 @@ function createEngine(CFG, CONF) {
     // The identical request is already waiting (e.g. the AI called the tool twice): keep that record and its id.
     const cur = st.pc;
     if (cur && cur.id && cur.act === rec.act && cur.ev === rec.ev && cur.os === rec.os && cur.oe === rec.oe && cur.fp === rec.fp && (cur.ns || null) === (rec.ns || null) && (cur.ne || null) === (rec.ne || null) &&
-      (cur.nsum || '') === (rec.nsum || '') && (cur.ndesc || '') === (rec.ndesc || '') && cur.k === rec.k && now < cur.exp && (st.pu || []).indexOf(cur.id) < 0) {
+      (cur.nsum || '') === (rec.nsum || '') && (cur.ndesc || '') === (rec.ndesc || '') && (cur.nsf || '') === (rec.nsf || '') && cur.k === rec.k && now < cur.exp && (st.pu || []).indexOf(cur.id) < 0) {
       s.P.rec = cur;
       return finish(s, confirmRequired(cur));
     }
@@ -1010,7 +1055,7 @@ function createEngine(CFG, CONF) {
       return GOTO(s, 'C.del');
     }
     s.x = { id: rec.ev, full: ev, orig: { summary: ev.summary, description: ev.description, start: ev.start, end: ev.end, s: rec.os, e: rec.oe },
-      newS: rec.ns, newE: rec.ne, idn: { k: rec.k }, newSummary: rec.nsum || '', newDesc: rec.ndesc || '', phone: digits(s.ctx.phone_number), ck: isChannelKey(customerCtx(s.ctx)) ? customerCtx(s.ctx).key : '', odate: ymd(rec.os), ot: hm(rec.os), relist: 9, put: 0, rb: 0 };
+      newS: rec.ns, newE: rec.ne, idn: { k: rec.k }, newSummary: rec.nsum || '', newDesc: rec.ndesc || '', newSvc: rec.nsf || '', phone: digits(s.ctx.phone_number), ck: isChannelKey(customerCtx(s.ctx)) ? customerCtx(s.ctx).key : '', odate: ymd(rec.os), ot: hm(rec.os), relist: 9, put: 0, rb: 0 };
     const a = dayStart(rec.ns);
     return listStart(s, 'new', a, a + DAY, 'X.slot');
   };
@@ -1135,6 +1180,9 @@ function createEngine(CFG, CONF) {
       const la = ctx.la;
       if (la && typeof la === 'object' && la.res === 'SUCCESS' && (la.act === 'cancel' || la.act === 'reschedule') && la.id && la.ev) {
         nst.la = { id: String(la.id), act: la.act, ev: String(la.ev), os: Number(la.os) || 0, ns: la.ns == null ? null : Number(la.ns), sum: String(la.sum || '').slice(0, 120), svc: String(la.svc || '').slice(0, 80), res: 'SUCCESS', at: now };
+        // A confirmed service change: the new services (four languages), length and end.
+        const lbl = (o) => { if (!o || typeof o !== 'object') return null; const r = {}; for (const l of ['en', 'fr', 'es', 'ar']) r[l] = String(o[l] == null ? '' : o[l]).slice(0, 160); return r; };
+        if (la.act === 'reschedule' && lbl(la.nl) && Number(la.nm) > 0) Object.assign(nst.la, { ne: Number(la.ne) || null, nl: lbl(la.nl), nm: Number(la.nm), ol: lbl(la.ol) });
         changed = true;
       }
       if (ctx.lang && ctx.lang !== st.lg) { nst.lg = ctx.lang; changed = true; }

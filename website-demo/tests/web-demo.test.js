@@ -595,6 +595,29 @@ test('C7 reschedule keeps the DEMO title and the service length, and never takes
   await send(env, msg(a, 'move it to 18:00'));
   assert.ok(/^OUTSIDE_HOURS: .*would end at 19:30/.test(env.toolCalls[env.toolCalls.length - 1].result), env.toolCalls[env.toolCalls.length - 1].result);
 });
+test('C7b service change on the website (Spanish): one confirmed update, backend length, DEMO title kept, "change" chips', async () => {
+  const env = makeEnv();
+  const a = sid();
+  env.ai.behave = () => ({ tools: [['book', bookArgs('2026-10-08', '10:00', '10:30', 'Omar Demo', 'blow_dry')]], output: 'OK' });
+  await send(env, msg(a, 'book', 'es'));
+  const id = events(env)[0].id;
+  env.ai.behave = () => ({ tools: [
+    ['check', { requested_date: '2026-10-08', requested_time: '10:00', service_keys: 'mechas, corte de mujer', exclude_appointment_time: '10:00' }],
+    ['reschedule', { old_appointment_date: '2026-10-08', old_appointment_time: '10:00', new_appointment_date: '2026-10-08', new_appointment_time: '10:00', new_service_keys: 'mechas, corte de mujer', new_summary: 'REAL NAME', new_description: 'free text' }]], output: 'Hecho, ya lo he cambiado.' });
+  const ask = await send(env, msg(a, 'Quiero añadir mechas y un corte a mi cita', 'es'));
+  assert.ok(/^FREE: 10:00-14:00/.test(env.toolCalls[env.toolCalls.length - 2].result), env.toolCalls[env.toolCalls.length - 2].result);
+  assert.ok(/^Para confirmar: ¿quieres cambiar tu cita “Secado y peinado \(brushing\)” del jueves 8 de octubre a las 10:00 a: Balayage \+ Corte de mujer y peinado - 240 minutos en total, el jueves 8 de octubre a las 10:00 \(hasta las 14:00\)\?/.test(ask.body.reply), ask.body.reply);
+  assert.deepStrictEqual(ask.body.quickReplies, ['Sí, cambiar', 'No, mantener']);
+  assert.ok(/T10:30/.test(events(env)[0].end.dateTime), 'nothing changed before the yes');
+  const done = await send(env, msg(a, 'Sí, cambiar', 'es'));
+  assert.ok(/^Hecho: tu cita es ahora Balayage \+ Corte de mujer y peinado el jueves 8 de octubre a las 10:00 \(hasta las 14:00\)/.test(done.body.reply), done.body.reply);
+  const ev = events(env);
+  assert.strictEqual(ev.length, 1);
+  assert.strictEqual(ev[0].id, id, 'the same appointment, updated (never cancelled and re-booked)');
+  assert.strictEqual(ev[0].summary, 'DEMO - Omar Demo');
+  assert.ok(/T14:00/.test(ev[0].end.dateTime), ev[0].end.dateTime);
+  assert.ok(/^Phone: 9\d{14}\. Service: Balayage \+ Women's haircut & styling \| Keys: balayage,womens_cut \| Duration: 240 min\. Notes: Website demo$/.test(ev[0].description), ev[0].description);
+});
 test('C8 quick replies follow the visitor\'s language: Confirm / Cancel chips, fake-name reminder when asking the name', async () => {
   const env = makeEnv();
   const s = sid();
@@ -733,7 +756,7 @@ async function checkVia(env, args, message) {
 
 test('A1 tool schema: requested_date required; requested_time and service_keys optional (the website demo only)', () => {
   const s = fromAiSchema(WFS.main.nodes.find((n) => n.name === 'Check_Availability'));
-  assert.deepStrictEqual(Object.fromEntries(Object.entries(s).map(([k, v]) => [k, v.required])), { requested_date: true, requested_time: false, service_keys: false });
+  assert.deepStrictEqual(Object.fromEntries(Object.entries(s).map(([k, v]) => [k, v.required])), { requested_date: true, requested_time: false, service_keys: false, exclude_appointment_time: false });
   assert.strictEqual(s.requested_time.def, '', 'a missing time becomes "" (whole day)');
   // The WhatsApp workflow (and so Messenger / Instagram) is NOT changed by this fix.
   const wa = JSON.parse(fs.readFileSync(path.join(DIR, '..', WB.FILES.main), 'utf8'));

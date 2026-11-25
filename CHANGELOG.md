@@ -1,5 +1,38 @@
 # CHANGELOG — Lumière Hair & Beauty Studio AI Receptionist
 
+## C2: safe service changes in one confirmed update (2026-11-25)
+
+Changing the services of an existing appointment (e.g. adding a balayage to a blow-dry) no longer means "cancel, then book again". Nothing was imported or published.
+
+- **Reschedule_Appointment** takes `new_service_keys` (the complete new selection). The engine:
+  - finds the customer's own appointment and resolves the new services from the catalogue (unknown, ambiguous and too-long selections are refused before anything is proposed);
+  - recalculates the length and checks the **whole new window** (the appointment itself does not block its own extension; closing time, closed days and other appointments do);
+  - records the exact change in the customer's pending confirmation. The record holds the new services in four languages, the backend length and end time, and the current services.
+- **Confirmation:** the server asks, for example: *"do you want to change your appointment “Blow-dry & styling” on Tuesday 6 October at 10:00 to: Balayage + Women's haircut & styling - 240 minutes in total, on Tuesday 6 October at 10:00 (until 14:00)?"*
+  - The question, the result and the late "already done" texts exist in English, French, Spanish and Arabic.
+  - The website shows "Yes, change it / No, keep it" chips.
+- **Execution:** one conditional PUT (`If-Match`) of the same calendar event, with the owner field first, the new service line and the notes kept. There is never a DELETE or a second booking. All existing protections apply:
+  - one-time confirmation id, used up before the write;
+  - the appointment must be unchanged since the proposal (staff edits and newer proposals invalidate the yes);
+  - the new window is re-checked at the moment of writing;
+  - verification after the write, with rollback to the original if another booking appears.
+- **Ambiguous PUT result:** when a change keeps the same times (another service of the same length), it is judged by the content too. It is never reported as "nothing changed" or "done" on the times alone.
+- **Check_Availability:** optional `exclude_appointment_time` leaves out the caller's OWN appointment being changed. Ownership is verified with the server-set phone number or customer key (the same rule as Find); another customer's appointment is never left out.
+- **Prompt:**
+  - the "SERVICE CHANGE WITH A DIFFERENT DURATION" section, which told the AI to cancel and re-book, is replaced by "CHANGING THE SERVICES OF AN APPOINTMENT";
+  - the build refuses a prompt that still describes cancel + re-book.
+- **Tests:** new `tests/service-change.test.js` (CH1–CH11), covering:
+  - one update of the same event;
+  - full-window and closing-time checks;
+  - refused services;
+  - a window taken before the yes;
+  - duplicate and stale confirmations;
+  - failed and lost-response writes;
+  - own-appointment exclusion;
+  - WhatsApp end to end in all four languages, including declines.
+
+  Website demo C7b (Spanish, chips, DEMO title kept). `npm test`: 16 suites, 277 tests.
+
 ## C1: the backend calculates appointment length from the service catalogue (2026-11-25)
 
 The AI is no longer authoritative for appointment length. Nothing was imported or published.
