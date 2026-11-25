@@ -47,12 +47,31 @@ function makeEnv(o) {
 }
 
 // ---- tool sub-workflows
+// The tool schema n8n builds from the $fromAI() calls of a tool node: a field WITHOUT a
+// default value (4th argument) is REQUIRED, and n8n rejects the whole tool call when the
+// AI leaves a required field out (the AI Agent then fails -> the visitor gets the fallback).
+function fromAiSchema(node) {
+  const fields = {};
+  for (const [field, expr] of Object.entries(node.parameters.workflowInputs.value)) {
+    if (typeof expr !== 'string' || expr.indexOf('$fromAI(') < 0) continue;
+    const body = expr.replace(/^=\{\{\s*/, '').replace(/\s*\}\}$/, '');
+    new Function('$fromAI', 'return (' + body + ');')(function (name, desc, type, def) {
+      fields[field] = { name, required: arguments.length < 4, def: arguments.length < 4 ? undefined : def };
+      return '';
+    });
+  }
+  return fields;
+}
 async function runTool(env, agentRun, key, aiArgs) {
   const node = agentRun.wf.nodes.find((n) => n.name === TOOL_NODE[key]);
   const ctx = agentRun.exprCtx({ json: {} }, 0, [{ json: {} }]);
+  const schema = fromAiSchema(node);
+  for (const [field, f] of Object.entries(schema)) {
+    if (f.required && aiArgs[field] == null) throw new Error('Received tool input did not match expected schema\n\n✖ Required\n  → at ' + f.name);
+  }
   const inputs = {};
   for (const [field, expr] of Object.entries(node.parameters.workflowInputs.value)) {
-    inputs[field] = typeof expr === 'string' && expr.indexOf('$fromAI(') >= 0 ? (aiArgs[field] != null ? aiArgs[field] : '') : agentRun.evalExpr(expr, ctx);
+    inputs[field] = schema[field] ? (aiArgs[field] != null ? aiArgs[field] : schema[field].def) : agentRun.evalExpr(expr, ctx);
   }
   const wfId = node.parameters.workflowId.value;
   const subKey = Object.keys(BUILD.WF).find((k) => BUILD.WF[k].id === wfId);
@@ -675,6 +694,102 @@ test('K1 daily cleanup deletes only DEMO events created more than 24 h ago', asy
   assert.strictEqual(st('manual01'), 'confirmed');
   assert.strictEqual(st('lumdemolockchatabc'), 'confirmed');
   assert.strictEqual(env.responses.length, 0, 'the cleanup run never answers a webhook');
+});
+
+// ---------------------------------------------------------------- availability (2026-11-25)
+// Found live: "Do you have any availability this Saturday?" -> the AI called Check_Availability
+// with a date but no time, n8n rejected the call (requested_time was REQUIRED in the tool
+// schema) and the visitor got the fallback. requested_time is now optional on the website demo.
+const TUE = '2026-10-06'; // the Tuesday after START
+const seedBusy = (env, id, from, to) => env.cal.seed(CAL, { id, summary: 'DEMO - Seeded ' + id, description: 'Phone: 900000000000001. Notes: Website demo', start: { dateTime: TUE + 'T' + from + ':00+01:00', timeZone: 'Africa/Algiers' }, end: { dateTime: TUE + 'T' + to + ':00+01:00', timeZone: 'Africa/Algiers' } });
+async function checkVia(env, args, message) {
+  env.ai.behave = () => ({ tools: [['check', args]], output: (steps) => 'Here is what I found.' + (steps.length ? '' : '') });
+  const before = env.toolCalls.length;
+  const r = await send(env, msg(sid(), message || 'Any availability on Tuesday?'));
+  return { r, call: env.toolCalls[before] };
+}
+
+test('A1 tool schema: requested_date required; requested_time and duration_minutes optional (the website demo only)', () => {
+  const s = fromAiSchema(WFS.main.nodes.find((n) => n.name === 'Check_Availability'));
+  assert.deepStrictEqual(Object.fromEntries(Object.entries(s).map(([k, v]) => [k, v.required])), { requested_date: true, requested_time: false, duration_minutes: false });
+  assert.strictEqual(s.requested_time.def, '', 'a missing time becomes "" (whole day)');
+  // The WhatsApp workflow (and so Messenger / Instagram) is NOT changed by this fix.
+  const wa = JSON.parse(fs.readFileSync(path.join(DIR, '..', WB.FILES.main), 'utf8'));
+  assert.strictEqual(fromAiSchema(wa.nodes.find((n) => n.name === 'Check_Availability')).requested_time.required, true, 'WhatsApp untouched');
+});
+
+test('A2 date only (time left out or empty): the real calendar for the whole day, free start times for the service, no fallback', async () => {
+  for (const args of [{ requested_date: TUE }, { requested_date: TUE, requested_time: '' }, { requested_date: TUE, requested_time: '   ' }]) {
+    const env = makeEnv();
+    seedBusy(env, 'busy1200', '12:00', '13:00');
+    const { r, call } = await checkVia(env, args);
+    assert.strictEqual(r.body.reply.indexOf(T.en.fallback), -1, JSON.stringify(args) + ' -> fallback: ' + r.body.reply);
+    assert.ok(/^HAS_EVENTS: 2026-10-06 has these busy periods: 12:00-13:00\./.test(call.result), call.result);
+    const slots = call.result.split('FREE_SLOTS: ')[1];
+    assert.ok(/^09:00, 09:30, .*11:30, 13:00, .*18:30 \(free start times for a 30-minute service\)\.$/.test(slots), slots);
+    assert.ok(!/\b12:00\b|\b12:30\b/.test(slots), 'a busy time is never offered: ' + slots);
+  }
+  // A day with nothing booked yet is reported as such (still read from the calendar).
+  const empty = makeEnv();
+  const { call } = await checkVia(empty, { requested_date: TUE });
+  assert.ok(/^EMPTY_DAY: 2026-10-06 has zero booked appointments\..*FREE_SLOTS: 09:00, /.test(call.result), call.result);
+});
+
+test('A3 date + specific time: the existing FREE / BUSY verdict is unchanged', async () => {
+  const env = makeEnv();
+  seedBusy(env, 'busy1000', '10:00', '11:00');
+  const free = (await checkVia(env, { requested_date: TUE, requested_time: '14:00' })).call.result;
+  const busy = (await checkVia(env, { requested_date: TUE, requested_time: '10:30' })).call.result;
+  assert.ok(/^FREE: 14:00-14:30 on 2026-10-06 is available/.test(free), free);
+  assert.ok(/^BUSY: 10:30 on 2026-10-06 is not free .*another appointment 10:00-11:00/.test(busy), busy);
+});
+
+test('A4 service duration: date only + 180 minutes -> only starts that fit before closing and around bookings', async () => {
+  const env = makeEnv();
+  seedBusy(env, 'busy1300', '13:00', '14:00');
+  const { call } = await checkVia(env, { requested_date: TUE, duration_minutes: '180' });
+  const slots = call.result.split('FREE_SLOTS: ')[1];
+  assert.ok(/latest start is 16:00/.test(call.result), call.result);
+  // 180 min must end by 13:00 (busy) -> 09:00-10:00, or start after 14:00 and end by 19:00 -> 14:00-16:00.
+  assert.strictEqual(slots, '09:00, 09:30, 10:00, 14:00, 14:30, 15:00, 15:30, 16:00 (free start times for a 180-minute service).');
+  for (const t of ['10:30', '11:00', '12:00', '13:00', '13:30', '16:30', '17:00']) assert.ok(slots.indexOf(t) < 0, t + ' would overlap 13:00-14:00 or end after 19:00: ' + slots);
+  const late = (await checkVia(env, { requested_date: TUE, requested_time: '16:30', duration_minutes: '180' })).call.result;
+  assert.ok(/^OUTSIDE_HOURS: .*would end after the salon closes \(19:00\)/.test(late), late);
+});
+
+test('A5 invalid date or time: INVALID_INPUT, nothing invented, no fallback', async () => {
+  for (const args of [{ requested_date: '2026-13-45' }, { requested_date: 'next saturday' }, { requested_date: '' }, { requested_date: TUE, requested_time: '25:00' }, { requested_date: TUE, requested_time: '10h' }]) {
+    const env = makeEnv();
+    const { r, call } = await checkVia(env, args);
+    assert.ok(/^INVALID_INPUT: The requested_(date|time) is (missing or )?malformed/.test(call.result), JSON.stringify(args) + ': ' + call.result);
+    assert.ok(!/FREE|FREE_SLOTS/.test(call.result), 'no availability invented: ' + call.result);
+    assert.strictEqual(r.body.reply.indexOf(T.en.fallback), -1);
+  }
+  // A required field the AI leaves out is still refused by n8n's schema (the date).
+  const env = makeEnv();
+  const { r } = await checkVia(env, { requested_time: '10:00' });
+  assert.ok(r.body.reply.indexOf(T.en.fallback) >= 0, 'missing date -> n8n rejects the call');
+});
+
+test('A6 fully booked day: date only -> no free start time; a specific time -> BUSY', async () => {
+  const env = makeEnv();
+  seedBusy(env, 'busyam', '09:00', '14:00');
+  seedBusy(env, 'busypm', '14:00', '19:00');
+  const day = (await checkVia(env, { requested_date: TUE })).call.result;
+  assert.ok(/^HAS_EVENTS: 2026-10-06 has these busy periods: 09:00-14:00, 14:00-19:00\./.test(day), day);
+  assert.ok(/FREE_SLOTS: none left on this day for a 30-minute service\.$/.test(day), day);
+  const t = (await checkVia(env, { requested_date: TUE, requested_time: '15:00' })).call.result;
+  assert.ok(/^BUSY: 15:00 on 2026-10-06 is not free/.test(t), t);
+});
+
+test('A7 regression: with requested_time REQUIRED (the previous build) a date-only question gave the fallback', async () => {
+  const old = JSON.parse(JSON.stringify(WFS.main));
+  const node = old.nodes.find((n) => n.name === 'Check_Availability');
+  node.parameters.workflowInputs.value.requested_time = node.parameters.workflowInputs.value.requested_time.replace(", 'string', '') }}", ", 'string') }}");
+  const env = makeEnv({ main: old });
+  const { r, call } = await checkVia(env, { requested_date: TUE }, 'Do you have any availability this Saturday?');
+  assert.strictEqual(call, undefined, 'n8n never ran the tool');
+  assert.ok(r.body.reply.indexOf(T.en.fallback) >= 0, 'old build -> fallback: ' + r.body.reply);
 });
 
 runTests('web-demo').then((r) => process.exit(r.fail ? 1 : 0));

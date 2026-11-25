@@ -1,5 +1,30 @@
 # CHANGELOG — Lumière Hair & Beauty Studio AI Receptionist
 
+## Website demo: availability questions without a time (2026-11-25)
+
+Found in the production test after the website-demo redeploy:
+- "Do you have any availability this Saturday?" got the fallback reply.
+- The AI called Check_Availability with a date but no time.
+- In n8n, a `$fromAI()` field without a default value is required in the tool schema, so n8n rejected the whole tool call ("Received tool input did not match expected schema - Required at requested_time"), and the AI Agent failed.
+
+This was not caused by the redeploy: the version live before it had the same field.
+
+- **Fix (website demo only):** the main workflow's Check_Availability tool now declares `requested_time` optional (default `''`).
+  - The Check Availability sub-workflow already reads the real Lumière Demo calendar for the whole day when no time is given: `EMPTY_DAY` / `HAS_EVENTS` plus `FREE_SLOTS` for the service length.
+  - With a time, the FREE / BUSY / OUTSIDE_HOURS verdicts are unchanged. Date and duration validation are unchanged.
+- **Unchanged:** the five website-demo sub-workflows; WhatsApp, Messenger and Instagram. Those three still declare `requested_time` required, a known open item for their own deployment.
+- **Test emulator:** it now enforces n8n's rule. A `$fromAI` field without a default is required, and a tool call missing it is rejected the way n8n rejects it. Before, it silently filled `''`, which is why the tests did not catch this.
+- **New tests** in `website-demo/tests/web-demo.test.js`:
+  - A1: tool schema;
+  - A2: date only, with the time left out, empty or blank;
+  - A3: date + time;
+  - A4: service duration;
+  - A5: invalid date or time;
+  - A6: fully booked day;
+  - A7: the old build reproduces the fallback.
+
+  `npm test`: 14 suites, 235 tests.
+
 ## Appointment authorization: a typed phone number is never proof of ownership (2026-11-25)
 
 Found in the final audit: on every channel, a customer could type another person's phone number. The AI passed it as `booked_phone_number`, and the tools then found, cancelled or moved that person's WhatsApp or phone bookings. Nothing was imported, published or activated.

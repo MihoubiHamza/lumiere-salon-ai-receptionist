@@ -111,7 +111,7 @@
           "mappingMode": "defineBelow",
           "value": {
             "requested_date": "={{ $fromAI('requested_date', 'The date to check availability for, format YYYY-MM-DD', 'string') }}",
-            "requested_time": "={{ $fromAI('requested_time', \"Optional. The specific start time to check, 24-hour HH:mm format. Provide this whenever the customer has proposed or you are about to offer/confirm one specific time. Leave empty only when you need the whole day's busy periods to propose several options.\", 'string') }}",
+            "requested_time": "={{ $fromAI('requested_time', \"Optional. The specific start time to check, 24-hour HH:mm format. Provide this whenever the customer has proposed or you are about to offer/confirm one specific time. Leave empty only when you need the whole day's busy periods to propose several options.\", 'string', '') }}",
             "duration_minutes": "={{ $fromAI('duration_minutes', 'The length of the service(s) in minutes, from SERVICES & PRICES (add them up for several services in one visit). Leave empty only if the service is not known yet.', 'string', '') }}",
             "demo_config": "={{ JSON.stringify($('DEMO CONFIG').first().json.tool) }}"
           },

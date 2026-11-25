@@ -523,7 +523,16 @@ function demoToolNode(wf, key) {
   return t;
 }
 function patchTools(wf) {
-  demoToolNode(wf, 'check');
+  const check = demoToolNode(wf, 'check');
+  // requested_time is OPTIONAL. In n8n a $fromAI() field without a default value is
+  // REQUIRED in the tool schema, and n8n rejects the WHOLE tool call when the AI leaves
+  // it out - so "any availability this Saturday?" (a date without a time) failed with
+  // "Received tool input did not match expected schema - Required at requested_time"
+  // and the visitor got the fallback reply (found live, 2026-11-25). An empty time makes
+  // the Check Availability workflow read the real calendar for the whole day (EMPTY_DAY /
+  // HAS_EVENTS + FREE_SLOTS for the service length). Website demo only.
+  const cv = check.parameters.workflowInputs.value;
+  cv.requested_time = replaceOnce(cv.requested_time, ", 'string') }}", ", 'string', '') }}", 'requested_time optional');
   const book = demoToolNode(wf, 'book');
   book.parameters.description = replaceOnce(book.parameters.description, 'Always include their phone number in the description.',
     'The booking is linked to this chat session automatically (no phone number).', 'book description');
