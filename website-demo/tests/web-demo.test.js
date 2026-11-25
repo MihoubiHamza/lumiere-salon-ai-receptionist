@@ -166,7 +166,8 @@ const msg = (sessionId, message, lang) => ({ sessionId, message, lang: lang || '
 const events = (env) => [...env.cal.store(CAL).values()].map((e) => e.cur).filter((e) => e.status !== 'cancelled' && !/^lumdemo(lock|rl)/.test(e.id)); // appointments only (no lock / rate-limit counter objects)
 const lockHeld = (env) => [...env.cal.store(CAL).values()].map((e) => e.cur).filter((e) => /^lumdemolockchat/.test(e.id)).some((e) => { try { return !!JSON.parse(e.description).h && JSON.parse(e.description).hx > env.sim.now; } catch (x) { return false; } });
 const T = DEMO.texts;
-const bookArgs = (date, start, end, summary, service) => ({ start_datetime: date + 'T' + start + ':00', end_datetime: date + 'T' + end + ':00', summary, service });
+// The length is never sent: the engine computes it from service_keys (a key or the catalogue name). `end` documents the expected end.
+const bookArgs = (date, start, end, summary, service) => ({ start_datetime: date + 'T' + start + ':00', summary, service_keys: service });
 
 // ================================================================= static
 test('S1 six workflows: names, fixed demo ids, inactive, no execution data saved', () => {
@@ -217,7 +218,8 @@ test('S2 graph: every connection, $() reference and tool link resolves; Code nod
     assert.ok('demo_config' in t.parameters.workflowInputs.value);
     if ('booked_phone_number' in t.parameters.workflowInputs.value) assert.strictEqual(t.parameters.workflowInputs.value.booked_phone_number, '');
   }
-  assert.ok('duration_minutes' in main.nodes.find((n) => n.name === 'Check_Availability').parameters.workflowInputs.value, 'Check_Availability takes the service duration');
+  assert.ok('service_keys' in main.nodes.find((n) => n.name === 'Check_Availability').parameters.workflowInputs.value, 'Check_Availability takes the service keys');
+  assert.ok(!('duration_minutes' in main.nodes.find((n) => n.name === 'Check_Availability').parameters.workflowInputs.value), 'the AI never sends a duration');
   const hook = main.nodes.find((n) => n.name === 'Website Webhook');
   assert.strictEqual(hook.parameters.httpMethod, 'POST');
   assert.strictEqual(hook.parameters.path, BUILD.WEBHOOK_PATH, 'webhook path from lumiere.config.js');
@@ -461,8 +463,8 @@ test('C2 booking in Spanish: free start times as chips, then "DEMO - <name>" eve
   const env = makeEnv();
   const s = sid();
   env.ai.behave = (call) => {
-    if (/martes/.test(call.text)) return { tools: [['check', { requested_date: '2026-10-06', requested_time: '', duration_minutes: '60' }]], output: 'El martes tengo libre a las 09:00, 09:30, 10:00 o 10:30. ¿Qué hora prefieres?' };
-    return { tools: [['check', { requested_date: '2026-10-06', requested_time: '10:00', duration_minutes: '60' }], ['book', Object.assign(bookArgs('2026-10-06', '10:00', '11:00', 'Lucía Demo', "Women's haircut & styling"), { notes: 'IGNORED free text' })]],
+    if (/martes/.test(call.text)) return { tools: [['check', { requested_date: '2026-10-06', requested_time: '', service_keys: 'womens_cut' }]], output: 'El martes tengo libre a las 09:00, 09:30, 10:00 o 10:30. ¿Qué hora prefieres?' };
+    return { tools: [['check', { requested_date: '2026-10-06', requested_time: '10:00', service_keys: 'womens_cut' }], ['book', Object.assign(bookArgs('2026-10-06', '10:00', '11:00', 'Lucía Demo', "Women's haircut & styling"), { notes: 'IGNORED free text' })]],
       output: (steps) => (/SUCCESS/.test(steps[1].observation) ? '¡Listo! Tu cita es el martes a las 10:00, Lucía Demo.' : 'Problema: ' + steps[1].observation) };
   };
   const r1 = await send(env, msg(s, 'Quiero una cita para un corte el martes', 'es'));
@@ -472,14 +474,15 @@ test('C2 booking in Spanish: free start times as chips, then "DEMO - <name>" eve
   assert.ok(r1.body.reply.indexOf(T.es.firstNotice) === 0, 'Spanish notice');
   const r2 = await send(env, msg(s, '10:00, Lucía Demo, corte de mujer', 'es'));
   assert.strictEqual(env.toolCalls.length, 3);
-  assert.ok(/^FREE: 10:00-11:00 .*60-minute service/.test(env.toolCalls[1].result), env.toolCalls[1].result);
+  assert.ok(/^FREE: 10:00-11:00 .*60-minute appointment.*Women's haircut & styling \(60 min\) = 60 minutes in total.*starting price from €45/.test(env.toolCalls[1].result), env.toolCalls[1].result);
   assert.ok(/^SUCCESS/.test(env.toolCalls[2].result), env.toolCalls[2].result);
   assert.deepStrictEqual(r2.body.quickReplies, T.es.afterBooking);
   const ev = events(env);
   assert.strictEqual(ev.length, 1);
   assert.strictEqual(ev[0].summary, 'DEMO - Lucía Demo');
   assert.ok(/T11:00/.test(ev[0].end.dateTime), 'the appointment lasts the whole service: ' + ev[0].end.dateTime);
-  assert.ok(/^Phone: 9\d{14}\. Notes: Website demo \| Service: Women's haircut & styling$/.test(ev[0].description), ev[0].description);
+  // The service line is written by the engine from the catalogue (the name the AI used was resolved to its key).
+  assert.ok(/^Phone: 9\d{14}\. Service: Women's haircut & styling \| Keys: womens_cut \| Duration: 60 min\. Notes: Website demo$/.test(ev[0].description), ev[0].description);
   assert.ok(!lockHeld(env));
 });
 test('C3 service length: a 180-minute balayage only gets start times that fit before closing and around other bookings', async () => {
@@ -487,17 +490,17 @@ test('C3 service length: a 180-minute balayage only gets start times that fit be
   const s = sid();
   env.ai.behave = () => ({ tools: [
     ['book', bookArgs('2026-10-06', '10:00', '11:00', 'Ana Demo', "Women's haircut & styling")],
-    ['check', { requested_date: '2026-10-06', requested_time: '', duration_minutes: '180' }],
-    ['check', { requested_date: '2026-10-06', requested_time: '09:00', duration_minutes: '180' }],
-    ['check', { requested_date: '2026-10-06', requested_time: '16:30', duration_minutes: '180' }],
-    ['check', { requested_date: '2026-10-06', requested_time: '16:00', duration_minutes: '180' }],
+    ['check', { requested_date: '2026-10-06', requested_time: '', service_keys: 'balayage' }],
+    ['check', { requested_date: '2026-10-06', requested_time: '09:00', service_keys: 'balayage' }],
+    ['check', { requested_date: '2026-10-06', requested_time: '16:30', service_keys: 'balayage' }],
+    ['check', { requested_date: '2026-10-06', requested_time: '16:00', service_keys: 'balayage' }],
     ['book', bookArgs('2026-10-06', '16:30', '19:30', 'Bea Demo', 'Balayage')]], output: 'OK' });
   await send(env, msg(s, 'balayage on tuesday?'));
   const res = env.toolCalls.map((t) => t.result);
   assert.ok(/^SUCCESS/.test(res[0]), res[0]);
   assert.ok(/FREE_SLOTS: 11:00, 11:30, .*16:00 \(free start times for a 180-minute service\)\.$/.test(res[1]) && !/09:00|09:30|16:30/.test(res[1].split('FREE_SLOTS:')[1]), res[1]);
-  assert.ok(/^BUSY: 09:00 .*180-minute service/.test(res[2]), res[2]);
-  assert.ok(/^OUTSIDE_HOURS: .*would end after the salon closes \(19:00\)\. The latest start for this service is 16:00/.test(res[3]), res[3]);
+  assert.ok(/^BUSY: 09:00-12:00 .*180-minute appointment \(Balayage/.test(res[2]), res[2]);
+  assert.ok(/^OUTSIDE_HOURS: .*would end at 19:30, after the salon closes \(19:00\)\. The latest start for these services is 16:00/.test(res[3]), res[3]);
   assert.ok(/^FREE: 16:00-19:00/.test(res[4]), res[4]);
   assert.ok(/^OUTSIDE_HOURS: .*would end at 19:30, after the salon closes.*Nothing was booked/.test(res[5]), 'the engine refuses a booking that ends after closing: ' + res[5]);
   assert.strictEqual(events(env).length, 1);
@@ -505,10 +508,10 @@ test('C3 service length: a 180-minute balayage only gets start times that fit be
 test('C3b optional break (when configured in DEMO CONFIG): refused during the break, slots skip it', async () => {
   const env = makeEnv({ main: BREAK_MAIN });
   env.ai.behave = () => ({ tools: [
-    ['check', { requested_date: '2026-10-06', requested_time: '13:00' }], ['check', { requested_date: '2026-10-06', requested_time: '12:30', duration_minutes: '60' }],
-    ['check', { requested_date: '2026-10-06', requested_time: '12:30' }], ['check', { requested_date: '2026-10-06', requested_time: '14:00' }],
+    ['check', { requested_date: '2026-10-06', requested_time: '13:00', service_keys: 'mens_cut' }], ['check', { requested_date: '2026-10-06', requested_time: '12:30', service_keys: 'womens_cut' }],
+    ['check', { requested_date: '2026-10-06', requested_time: '12:30', service_keys: 'mens_cut' }], ['check', { requested_date: '2026-10-06', requested_time: '14:00', service_keys: 'mens_cut' }],
     ['book', bookArgs('2026-10-06', '13:30', '14:00', 'Ali Demo', "Men's haircut")],
-    ['check', { requested_date: '2026-10-06', requested_time: '' }]], output: 'OK' });
+    ['check', { requested_date: '2026-10-06', requested_time: '', service_keys: 'mens_cut' }]], output: 'OK' });
   await send(env, msg(sid(), 'lunchtime?'));
   const res = env.toolCalls.map((t) => t.result);
   assert.ok(/^OUTSIDE_HOURS: .*13:00 .*break/.test(res[0]), res[0]);
@@ -648,15 +651,34 @@ test('C9 failures: AI error and corrupted output give the friendly fallback, loc
 test('C10 a tool called without DEMO CONFIG fails closed (nothing written)', async () => {
   const env = makeEnv();
   const r = new Runner(WFS.book, { sim: env.sim, persisted: env.persisted, envVars: {}, opts: env.opts, hooks: { http: (req) => env.cal.request(req), nodes: {}, types: {} } });
-  const p = r.run('Execute Workflow Trigger', [{ json: { start_datetime: '2026-10-06T10:00:00', end_datetime: '2026-10-06T10:30:00', summary: 'X Demo', service: "Men's haircut", phone_number: '912345678901234' } }]);
+  const p = r.run('Execute Workflow Trigger', [{ json: { start_datetime: '2026-10-06T10:00:00', summary: 'X Demo', service_keys: 'mens_cut', phone_number: '912345678901234' } }]);
   await env.sim.run();
   const res = await p;
   assert.ok(/^ERROR_NEEDS_STAFF/.test(res.output[0].json.result), res.output[0].json.result);
   assert.strictEqual(env.cal.log.length, 0, 'no calendar call at all');
 });
 
+test('C12 services on the website: resolved by the engine from the catalogue; an unknown or ambiguous service is refused, never replaced by a default', async () => {
+  const env = makeEnv();
+  env.ai.behave = () => ({ tools: [
+    ['book', bookArgs('2026-10-06', '10:00', '14:00', 'Inès Demo', 'balayage, Coupe femme & coiffage, brushing')],
+    ['book', bookArgs('2026-10-07', '10:00', '-', 'Max Demo', 'Massage')],
+    ['book', bookArgs('2026-10-07', '11:00', '-', 'Max Demo', 'haircut')],
+    ['check', { requested_date: '2026-10-07', requested_time: '', service_keys: 'mechas' }]], output: 'OK' });
+  await send(env, msg(sid(), 'réserver', 'fr'));
+  const res = env.toolCalls.map((t) => t.result);
+  assert.ok(/^SUCCESS: Booked "DEMO - Inès Demo" on 2026-10-06 10:00-14:00\./.test(res[0]) && /= 240 minutes in total/.test(res[0]), res[0]);
+  assert.ok(/^SERVICE_UNKNOWN: "Massage"/.test(res[1]), 'the former guard silently booked the first service instead: ' + res[1]);
+  assert.ok(/^SERVICE_AMBIGUOUS: "haircut" could mean/.test(res[2]), res[2]);
+  assert.ok(/FREE_SLOTS: 09:00, .*16:00 \(free start times for a 180-minute service\)\.$/.test(res[3]), res[3]);
+  const ev = events(env);
+  assert.strictEqual(ev.length, 1, 'nothing booked for an unknown or ambiguous service');
+  assert.ok(/T14:00/.test(ev[0].end.dateTime), ev[0].end.dateTime);
+  assert.ok(/\| Keys: balayage,womens_cut,blow_dry \| Duration: 240 min\. Notes: Website demo$/.test(ev[0].description), ev[0].description);
+});
+
 test('C11 two visitors book the same slot at the same moment: exactly one wins; a booking answers well under 45 s', async () => {
-  const env = makeEnv({ ai: { behave: () => ({ thinkMs: 2500, tools: [['check', { requested_date: '2026-10-06', requested_time: '11:00', duration_minutes: '45' }], ['book', bookArgs('2026-10-06', '11:00', '11:45', 'Race Demo', 'Manicure')]], output: 'OK' }) } });
+  const env = makeEnv({ ai: { behave: () => ({ thinkMs: 2500, tools: [['check', { requested_date: '2026-10-06', requested_time: '11:00', service_keys: 'manicure' }], ['book', bookArgs('2026-10-06', '11:00', '11:45', 'Race Demo', 'Manicure')]], output: 'OK' }) } });
   const runOne = (s) => { const r = new Runner(env.main, { sim: env.sim, persisted: env.persisted, envVars: {}, opts: env.opts, hooks: mainHooks(env) }); return r.run('Website Webhook', [webItem(msg(s, 'book 11am'))]); };
   const t0 = env.sim.now;
   const ps = [runOne(sid()), runOne(sid())];
@@ -709,9 +731,9 @@ async function checkVia(env, args, message) {
   return { r, call: env.toolCalls[before] };
 }
 
-test('A1 tool schema: requested_date required; requested_time and duration_minutes optional (the website demo only)', () => {
+test('A1 tool schema: requested_date required; requested_time and service_keys optional (the website demo only)', () => {
   const s = fromAiSchema(WFS.main.nodes.find((n) => n.name === 'Check_Availability'));
-  assert.deepStrictEqual(Object.fromEntries(Object.entries(s).map(([k, v]) => [k, v.required])), { requested_date: true, requested_time: false, duration_minutes: false });
+  assert.deepStrictEqual(Object.fromEntries(Object.entries(s).map(([k, v]) => [k, v.required])), { requested_date: true, requested_time: false, service_keys: false });
   assert.strictEqual(s.requested_time.def, '', 'a missing time becomes "" (whole day)');
   // The WhatsApp workflow (and so Messenger / Instagram) is NOT changed by this fix.
   const wa = JSON.parse(fs.readFileSync(path.join(DIR, '..', WB.FILES.main), 'utf8'));
@@ -719,7 +741,7 @@ test('A1 tool schema: requested_date required; requested_time and duration_minut
 });
 
 test('A2 date only (time left out or empty): the real calendar for the whole day, free start times for the service, no fallback', async () => {
-  for (const args of [{ requested_date: TUE }, { requested_date: TUE, requested_time: '' }, { requested_date: TUE, requested_time: '   ' }]) {
+  for (const args of [{ requested_date: TUE, service_keys: 'mens_cut' }, { requested_date: TUE, requested_time: '', service_keys: 'mens_cut' }, { requested_date: TUE, requested_time: '   ', service_keys: "Men's haircut" }]) {
     const env = makeEnv();
     seedBusy(env, 'busy1200', '12:00', '13:00');
     const { r, call } = await checkVia(env, args);
@@ -731,30 +753,33 @@ test('A2 date only (time left out or empty): the real calendar for the whole day
   }
   // A day with nothing booked yet is reported as such (still read from the calendar).
   const empty = makeEnv();
-  const { call } = await checkVia(empty, { requested_date: TUE });
+  const { call } = await checkVia(empty, { requested_date: TUE, service_keys: 'mens_cut' });
   assert.ok(/^EMPTY_DAY: 2026-10-06 has zero booked appointments\..*FREE_SLOTS: 09:00, /.test(call.result), call.result);
+  // No service yet: the real busy periods, but no start-time list for an invented length (never a default service).
+  const nosvc = (await checkVia(makeEnv(), { requested_date: TUE })).call.result;
+  assert.ok(/^EMPTY_DAY: 2026-10-06/.test(nosvc) && nosvc.indexOf('FREE_SLOTS') < 0 && /service_keys/.test(nosvc), nosvc);
 });
 
 test('A3 date + specific time: the existing FREE / BUSY verdict is unchanged', async () => {
   const env = makeEnv();
   seedBusy(env, 'busy1000', '10:00', '11:00');
-  const free = (await checkVia(env, { requested_date: TUE, requested_time: '14:00' })).call.result;
-  const busy = (await checkVia(env, { requested_date: TUE, requested_time: '10:30' })).call.result;
+  const free = (await checkVia(env, { requested_date: TUE, requested_time: '14:00', service_keys: 'mens_cut' })).call.result;
+  const busy = (await checkVia(env, { requested_date: TUE, requested_time: '10:30', service_keys: 'mens_cut' })).call.result;
   assert.ok(/^FREE: 14:00-14:30 on 2026-10-06 is available/.test(free), free);
-  assert.ok(/^BUSY: 10:30 on 2026-10-06 is not free .*another appointment 10:00-11:00/.test(busy), busy);
+  assert.ok(/^BUSY: 10:30-11:00 on 2026-10-06 is not free .*another appointment 10:00-11:00/.test(busy), busy);
 });
 
 test('A4 service duration: date only + 180 minutes -> only starts that fit before closing and around bookings', async () => {
   const env = makeEnv();
   seedBusy(env, 'busy1300', '13:00', '14:00');
-  const { call } = await checkVia(env, { requested_date: TUE, duration_minutes: '180' });
+  const { call } = await checkVia(env, { requested_date: TUE, service_keys: 'balayage' });
   const slots = call.result.split('FREE_SLOTS: ')[1];
   assert.ok(/latest start is 16:00/.test(call.result), call.result);
   // 180 min must end by 13:00 (busy) -> 09:00-10:00, or start after 14:00 and end by 19:00 -> 14:00-16:00.
   assert.strictEqual(slots, '09:00, 09:30, 10:00, 14:00, 14:30, 15:00, 15:30, 16:00 (free start times for a 180-minute service).');
   for (const t of ['10:30', '11:00', '12:00', '13:00', '13:30', '16:30', '17:00']) assert.ok(slots.indexOf(t) < 0, t + ' would overlap 13:00-14:00 or end after 19:00: ' + slots);
-  const late = (await checkVia(env, { requested_date: TUE, requested_time: '16:30', duration_minutes: '180' })).call.result;
-  assert.ok(/^OUTSIDE_HOURS: .*would end after the salon closes \(19:00\)/.test(late), late);
+  const late = (await checkVia(env, { requested_date: TUE, requested_time: '16:30', service_keys: 'balayage' })).call.result;
+  assert.ok(/^OUTSIDE_HOURS: .*would end at 19:30, after the salon closes \(19:00\)/.test(late), late);
 });
 
 test('A5 invalid date or time: INVALID_INPUT, nothing invented, no fallback', async () => {
@@ -775,11 +800,11 @@ test('A6 fully booked day: date only -> no free start time; a specific time -> B
   const env = makeEnv();
   seedBusy(env, 'busyam', '09:00', '14:00');
   seedBusy(env, 'busypm', '14:00', '19:00');
-  const day = (await checkVia(env, { requested_date: TUE })).call.result;
+  const day = (await checkVia(env, { requested_date: TUE, service_keys: 'mens_cut' })).call.result;
   assert.ok(/^HAS_EVENTS: 2026-10-06 has these busy periods: 09:00-14:00, 14:00-19:00\./.test(day), day);
   assert.ok(/FREE_SLOTS: none left on this day for a 30-minute service\.$/.test(day), day);
-  const t = (await checkVia(env, { requested_date: TUE, requested_time: '15:00' })).call.result;
-  assert.ok(/^BUSY: 15:00 on 2026-10-06 is not free/.test(t), t);
+  const t = (await checkVia(env, { requested_date: TUE, requested_time: '15:00', service_keys: 'mens_cut' })).call.result;
+  assert.ok(/^BUSY: 15:00-15:30 on 2026-10-06 is not free/.test(t), t);
 });
 
 test('A7 regression: with requested_time REQUIRED (the previous build) a date-only question gave the fallback', async () => {

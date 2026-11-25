@@ -157,7 +157,8 @@ function configGuard(sourceExpr) {
   return '// Salon values come only from the DEMO CONFIG node of "' + NAME + '".\n' +
     'Object.assign(CFG, ' + sourceExpr + ');\n' +
     "for (const k of " + JSON.stringify(CLINIC_KEYS.filter((k) => k !== 'CALENDAR_NAME')) + ") if (CFG[k] == null || CFG[k] === '') throw new Error('DEMO CONFIG is missing ' + k);\n" +
-    "if (/^PASTE_/.test(String(CFG.CALENDAR_ID))) throw new Error('DEMO CONFIG: set CALENDAR_ID to the Lumière demo calendar');\n";
+    "if (/^PASTE_/.test(String(CFG.CALENDAR_ID))) throw new Error('DEMO CONFIG: set CALENDAR_ID to the Lumière demo calendar');\n" +
+    "if (!Array.isArray(CFG.SERVICE_CATALOG) || !CFG.SERVICE_CATALOG.length) throw new Error('DEMO CONFIG is missing SERVICE_CATALOG');\n";
 }
 const MAIN_CFG_SRC = "$('DEMO CONFIG').first().json.tool";
 const TOOL_CFG_SRC = "JSON.parse($('Execute Workflow Trigger').first().json.demo_config || '{}')";
@@ -226,10 +227,11 @@ const toMin = (t) => Number(t.split(':')[0]) * 60 + Number(t.split(':')[1]);
 const hm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
 const longest = S.services.reduce((a, s) => (s.duration > a.duration ? s : a), S.services[0]);
 const price = (s) => (s.fromPrice ? 'from ' : '') + S.currencySymbol + s.price;
+const incl = (s) => { const n = (s.includes || []).map((k) => (S.services.find((x) => x.key === k) || {}).name).filter(Boolean); return n.length ? ' - already includes ' + n.join(', ') + ' (never add it on top)' : ''; };
 const cats = [];
 for (const s of S.services) if (cats.indexOf(s.category) < 0) cats.push(s.category);
 const menu = cats.map((cat) => cat + ':\\n' + S.services.filter((s) => s.category === cat)
-  .map((s) => '- ' + s.name + ' (FR: ' + s.name_fr + ' | ES: ' + s.name_es + ' | AR: ' + s.name_ar + ') - ' + s.duration + ' min - ' + price(s)).join('\\n')).join('\\n');
+  .map((s) => '- [' + s.key + '] ' + s.name + ' (FR: ' + s.name_fr + ' | ES: ' + s.name_es + ' | AR: ' + s.name_ar + ') - ' + s.duration + ' min - ' + price(s) + incl(s)).join('\\n')).join('\\n');
 const promptSalonInfo = [
   '## SALON INFO (fictional demo salon - the official info sheet)',
   '- Salon name: ' + S.name + ' (' + S.name_ar + ') - ' + S.description + '. A FICTIONAL salon that exists only for this website demo.',
@@ -242,7 +244,7 @@ const promptSalonInfo = [
   '',
   '### SERVICES & PRICES (demo price list - the ONLY services, prices and durations you may quote; prices in ' + S.currency + ')',
   menu,
-  "Use the service name in the visitor's language. Durations are the time blocked on the calendar; use them for duration_minutes and for the appointment end time.",
+  "Use the service name in the visitor's language. The [key] of each service is what you pass to the tools as service_keys (several services: all their keys, comma-separated, e.g. balayage,womens_cut). The booking system calculates the appointment length and end time from these keys itself - you never pass a duration or an end time. A service that already includes another covers it: never add the included one on top.",
   '',
   '### SALON POLICIES (demo)',
   S.policies.map((p) => '- ' + p).join('\\n'),
@@ -253,7 +255,8 @@ const promptSalonInfo = [
 ].join('\\n');
 
 return [{ json: Object.assign({}, DEMO, {
-  tool: Object.assign({}, T, { SERVICES: S.services.map((s) => s.name) }),
+  // The service catalogue: the ONLY source of appointment lengths for the engine (service_keys).
+  tool: Object.assign({}, T, { SERVICE_CATALOG: S.services.map((s) => ({ key: s.key, name: s.name, name_fr: s.name_fr, name_es: s.name_es, name_ar: s.name_ar, duration: s.duration, price: s.price, fromPrice: !!s.fromPrice, includes: s.includes || [], aliases: s.aliases || [] })) }),
   promptSalonInfo,
   servicesList: S.services.map((s) => s.name).join(', '),
 }) }];
@@ -550,7 +553,11 @@ function patchTools(wf) {
   const bv = book.parameters.workflowInputs.value;
   bv.summary = "={{ $fromAI('summary', 'Only the visitor full name exactly as they gave it (a fake name is expected) - first and family name, nothing else.', 'string') }}";
   bv.notes = 'Website demo';
-  setToolInput(book, 'service', "={{ $fromAI('service', 'The service the visitor chose, using its English name exactly as written in SERVICES & PRICES (for several services, the main one).', 'string') }}");
+  // The services come from service_keys (same field as WhatsApp); the engine resolves them and writes
+  // the service line itself. The former free "service" field (silently defaulted to the first service
+  // when unknown) is gone.
+  delete bv.service;
+  book.parameters.workflowInputs.schema = book.parameters.workflowInputs.schema.filter((f) => f.id !== 'service');
 
   const find = demoToolNode(wf, 'find');
   find.parameters.description = replaceOnce(find.parameters.description,
@@ -705,18 +712,18 @@ function startCode(op, from, extra) {
     "return [{ json: { __engineStart: { op: '" + op + "', ctx: t } } }];\n";
 }
 const BOOK_GUARD_CODE = `// Demo rules for every booking: the title is always "DEMO - <name>" and the
-// notes never contain free text from the conversation (only the service).
+// notes never contain free text from the conversation. The services (service_keys) are passed
+// through unchanged: the engine resolves them from the catalogue, refuses unknown or ambiguous
+// ones (never a default service) and computes the length and end time itself.
 const t = $('Execute Workflow Trigger').first().json;
 const DC = JSON.parse(t.demo_config || '{}');
 if (!DC.CALENDAR_ID || /^PASTE_/.test(String(DC.CALENDAR_ID))) throw new Error('DEMO CONFIG: CALENDAR_ID is not set');
 const name = String(t.summary || '').replace(/^\\s*DEMO\\s*-\\s*/i, '').replace(/[\\r\\n\\t]+/g, ' ').replace(/\\s+/g, ' ').trim().slice(0, 60);
-const svcIn = String(t.service || '').trim().toLowerCase();
-const svc = (DC.SERVICES || []).find((s) => s.toLowerCase() === svcIn) || (DC.SERVICES || [])[0] || '';
 return [{ json: {
   start_datetime: t.start_datetime,
-  end_datetime: t.end_datetime,
+  service_keys: t.service_keys == null ? '' : t.service_keys,
   summary: name ? 'DEMO - ' + name : '',
-  notes: 'Website demo' + (svc ? ' | Service: ' + svc : ''),
+  notes: 'Website demo',
   phone_number: String(t.phone_number || '').replace(/\\D/g, ''),
   demoConfig: DC,
 } }];
@@ -738,7 +745,7 @@ return [{ json: { underLimit: mine < max, mine, max } }];
 `;
 function buildBook() {
   const wf = load('book');
-  demoTrigger(wf, ['service']);
+  demoTrigger(wf);
   demoCredentialsAndCode(wf, TOOL_CFG_SRC);
   const [tx, ty] = must(wf, 'Execute Workflow Trigger').position;
   for (const n of wf.nodes) if (n.name !== 'Execute Workflow Trigger') n.position = [n.position[0] + 672, n.position[1]];
@@ -756,7 +763,7 @@ function buildBook() {
   conn(wf, 'Count Session Bookings', [['Booking Limit Check']]);
   conn(wf, 'Booking Limit Check', [['Under Limit?'], ['Engine Failed - Result']]);
   conn(wf, 'Under Limit?', [['Engine: Start'], ['Format Limit Reached']]);
-  put(wf, sticky('Note: Book', '## Demo booking\n1. **Demo Input Guard**: title forced to "DEMO - <name>", notes = service only (no free text).\n2. **Count Session Bookings / Booking Limit Check**: max ' + DEMO.tool.MAX_BOOKINGS_PER_SESSION + ' demo appointments per chat session.\n3. Engine (unchanged, plus the optional break rule): calendar lock, hours, closing time, closed day, conflicts, duplicate protection.\nCalendar and rules come from DEMO CONFIG (input `demo_config`).', [tx - 40, ty - 360], 980, 260, 5));
+  put(wf, sticky('Note: Book', '## Demo booking\n1. **Demo Input Guard**: title forced to "DEMO - <name>", no free-text notes; services (service_keys) resolved by the engine from the catalogue.\n2. **Count Session Bookings / Booking Limit Check**: max ' + DEMO.tool.MAX_BOOKINGS_PER_SESSION + ' demo appointments per chat session.\n3. Engine (unchanged, plus the optional break rule): calendar lock, hours, closing time, closed day, conflicts, duplicate protection.\nCalendar and rules come from DEMO CONFIG (input `demo_config`).', [tx - 40, ty - 360], 980, 260, 5));
   return finish(wf, 'book');
 }
 function buildCancelOrReschedule(key) {
@@ -797,7 +804,6 @@ function buildCheck() {
   vc = replaceOnce(vc, "const trig = $('Execute Workflow Trigger').first().json;\n", "const trig = $('Execute Workflow Trigger').first().json;\nconst DC = JSON.parse(trig.demo_config || '{}');\n", 'validate config');
   if (!/\{ zone: '[^']+' \}/.test(vc)) throw new Error('build-web-demo: anchor not found for validate zone');
   vc = vc.replace(/\{ zone: '[^']+' \}/g, '{ zone: DC.TIMEZONE }');
-  vc = replaceOnce(vc, 'const defaultMin = 30;', 'const defaultMin = DC.APPT_DEFAULT_MIN;', 'validate length');
   if (/zone: '|\b30\b/.test(vc)) throw new Error('build-web-demo: Validate Input still has a hardcoded salon value');
   val.parameters.jsCode = vc;
   demoCalendarNode(must(wf, "Find That Day's Events"),
@@ -812,7 +818,7 @@ function buildCheck() {
   cc = replaceOnce(cc, '  } else if (reqStart <= now) {',
     "  } else if (inLunch(m, dur)) {\n    result = 'OUTSIDE_HOURS: a ' + dur + '-minute service at ' + v.requestedTime + ' on ' + v.dateOnly + ' would overlap the salon\\'s break (' + CFG.LUNCH_START + '-' + CFG.LUNCH_END + '). Tell the visitor plainly and offer a time outside the break - never offer or confirm this time.';\n  } else if (reqStart <= now) {", 'check lunch branch');
   cc = replaceOnce(cc, 'return [{ json: { result } }];',
-    "if (/^(EMPTY_DAY|HAS_EVENTS|BUSY|OUTSIDE_HOURS)/.test(result)) {\n  const slots = [];\n  for (let m = toMin(CFG.WORK_START); m + dur <= toMin(CFG.WORK_END); m += CFG.APPT_DEFAULT_MIN) {\n    if (inLunch(m, dur)) continue;\n    const s = dayMs + m * 60000, e = s + dur * 60000;\n    if (s <= now || busy.some((b) => b.s < e && b.e > s)) continue;\n    slots.push(E.hm(s));\n  }\n  result += (CFG.LUNCH_START ? ' The salon is OPEN this day; only the break ' + CFG.LUNCH_START + '-' + CFG.LUNCH_END + ' has no appointments.' : '') + (slots.length ? ' FREE_SLOTS: ' + slots.join(', ') + ' (free start times for a ' + dur + '-minute service).' : ' FREE_SLOTS: none left on this day for a ' + dur + '-minute service.');\n}\nreturn [{ json: { result } }];", 'check free slots');
+    "if (dur && /^(EMPTY_DAY|HAS_EVENTS|BUSY|OUTSIDE_HOURS)/.test(result)) {\n  const slots = [];\n  for (let m = toMin(CFG.WORK_START); m + dur <= toMin(CFG.WORK_END); m += CFG.APPT_DEFAULT_MIN) {\n    if (inLunch(m, dur)) continue;\n    const s = dayMs + m * 60000, e = s + dur * 60000;\n    if (s <= now || busy.some((b) => b.s < e && b.e > s)) continue;\n    slots.push(E.hm(s));\n  }\n  result += (CFG.LUNCH_START ? ' The salon is OPEN this day; only the break ' + CFG.LUNCH_START + '-' + CFG.LUNCH_END + ' has no appointments.' : '') + (slots.length ? ' FREE_SLOTS: ' + slots.join(', ') + ' (free start times for a ' + dur + '-minute service).' : ' FREE_SLOTS: none left on this day for a ' + dur + '-minute service.');\n}\nreturn [{ json: { result } }];", 'check free slots');
   comp.parameters.jsCode = cc;
   const [tx, ty] = must(wf, 'Execute Workflow Trigger').position;
   put(wf, sticky('Note: check', '## Demo availability\nSame verdicts as WhatsApp/Messenger (FREE, BUSY, OUTSIDE_HOURS, CLOSED_DAY, EMPTY_DAY, HAS_EVENTS, PAST_...) for the length of the requested service, plus the optional break and a `FREE_SLOTS:` list used for the website quick replies. Hours, break, closed day, default length and calendar come from DEMO CONFIG (input `demo_config`).', [tx - 40, ty - 300], 760, 200, 5));

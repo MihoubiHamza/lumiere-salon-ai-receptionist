@@ -226,7 +226,7 @@ test('P16 different patients are NOT serialized against each other (no global bo
 });
 
 test('P17 two patients\' AI turns book the same slot at the same moment -> one SUCCESS; false claim is caught', async () => {
-  const req = (phone, name) => ({ start_datetime: '2026-10-06T10:00:00', end_datetime: '2026-10-06T10:30:00', summary: name + ' - Kashf', notes: '', phone_number: phone });
+  const req = (phone, name) => ({ start_datetime: '2026-10-06T10:00:00', service_keys: 'mens_cut', summary: name + ' - Kashf', notes: '', phone_number: phone });
   const env = base({ seed: 121, ai: { thinkMs: 500, behave: (c) => ({
     thinkMs: 500,
     tools: async (env2) => { const r = await callTool(env2, 'book', req(c.chat, c.chat === P1 ? 'Sara' : 'Amine')); c.bookResult = r.result; return [{ action: { tool: 'Book_Appointment' }, observation: JSON.stringify([{ result: r.result }]) }]; },

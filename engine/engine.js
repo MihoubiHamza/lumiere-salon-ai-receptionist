@@ -302,6 +302,98 @@ function createEngine(CFG, CONF) {
     return R('OUTSIDE_HOURS', 'OUTSIDE_HOURS: an appointment of ' + Math.round((en - st) / 60000) + ' minutes starting at ' + hm(st) + ' on ' + ymd(st) + ' would end at ' + hm(en) + ', after the salon closes (' + CFG.WORK_END + '). Nothing was ' + verb + '. Offer an earlier start time so the service ends by ' + CFG.WORK_END + '.');
   }
 
+  // ---------------------------------------------------------------- services
+  // The service catalogue (salon-info.js, injected as CFG.SERVICE_CATALOG) is the ONLY
+  // source of an appointment's length. Tools receive canonical service keys; the AI
+  // never supplies a duration or an end time. Matching is exact after normalisation
+  // (case, accents, Arabic diacritics/hamza forms, punctuation) - never fuzzy. A term
+  // that names several services is AMBIGUOUS and an unknown term is refused: the
+  // backend never silently picks a default service.
+  const SVC_MAX = 6;
+  function normSvc(v) {
+    return String(v == null ? '' : v).toLowerCase().normalize('NFKD')
+      .replace(/[̀-ًͯ-ٰٟـ]/g, '')
+      .replace(/['’`]/g, '').replace(/&/g, ' and ').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  }
+  let SVC_IDX = null;
+  function svcIndex() {
+    if (SVC_IDX) return SVC_IDX;
+    const byKey = {}, byTerm = {}, order = [];
+    for (const sv of Array.isArray(CFG.SERVICE_CATALOG) ? CFG.SERVICE_CATALOG : []) {
+      if (!sv || !/^[a-z][a-z0-9_]*$/.test(String(sv.key)) || !(Number(sv.duration) > 0)) continue;
+      byKey[sv.key] = sv; order.push(sv.key);
+      for (const t of [sv.key, sv.key.replace(/_/g, ' '), sv.name, sv.name_fr, sv.name_es, sv.name_ar].concat(sv.aliases || [])) {
+        const n = normSvc(t);
+        if (!n) continue;
+        const ks = byTerm[n] || (byTerm[n] = []);
+        if (ks.indexOf(sv.key) < 0) ks.push(sv.key);
+      }
+    }
+    return (SVC_IDX = { byKey, byTerm, order });
+  }
+  // Everything a service contains, directly or through another included service.
+  function svcContains(idx, k, seen) {
+    const out = [];
+    for (const i of (idx.byKey[k] && idx.byKey[k].includes) || []) {
+      if (!idx.byKey[i] || (seen || []).indexOf(i) >= 0) continue;
+      out.push(i);
+      for (const j of svcContains(idx, i, (seen || []).concat([k, i]))) if (out.indexOf(j) < 0) out.push(j);
+    }
+    return out;
+  }
+  // service_keys arrives as an array, a JSON array string or a comma-separated string.
+  function svcTerms(v) {
+    if (Array.isArray(v)) return v.map((x) => String(x == null ? '' : x).trim()).filter(Boolean);
+    const s = String(v == null ? '' : v).trim();
+    if (!s) return [];
+    if (s[0] === '[') { try { const a = JSON.parse(s); if (Array.isArray(a)) return svcTerms(a); } catch (e) { /* not JSON: split below */ } }
+    return s.split(/[,;|\n]+/).map((x) => x.replace(/^["'\s]+|["'\s]+$/g, '')).filter(Boolean);
+  }
+  function svcLookup(idx, t) { const lk = t.toLowerCase(); return idx.byKey[lk] ? [lk] : idx.byTerm[normSvc(t)] || []; }
+  const svcPrice = (n) => (CFG.CURRENCY_SYMBOL || '') + n;
+  // -> { keys, counted, included, minutes, label, priceText, text } or { error: R(...) }
+  function resolveServices(v) {
+    const idx = svcIndex();
+    if (!idx.order.length) return { error: R('ERROR', 'ERROR: The service list is not available to the booking system, so nothing was checked or booked. Apologize briefly and call Escalate_to_Staff.') };
+    const terms = svcTerms(v);
+    if (!terms.length) return { error: R('SERVICE_REQUIRED', 'SERVICE_REQUIRED: No service was given, so the appointment length is unknown and nothing was checked or booked. Ask the customer which service(s) they want, then call this tool again with service_keys (the keys in [brackets] in SERVICES & PRICES).') };
+    if (terms.length > SVC_MAX) return { error: R('INVALID_INPUT', 'INVALID_INPUT: Too many services in one request (at most ' + SVC_MAX + '). One appointment is for ONE person; book each person separately.') };
+    const keys = [], unknown = [], ambiguous = [];
+    // "a + b" separates two services only when the whole text is not itself a service name
+    // (e.g. "Nourishing hair treatment (mask + blow-dry)" is ONE service).
+    const items = [];
+    for (const t of terms) {
+      if (!svcLookup(idx, t).length && t.indexOf('+') >= 0) for (const x of t.split('+')) { const y = x.trim(); if (y) items.push(y); }
+      else items.push(t);
+    }
+    if (items.length > SVC_MAX) return { error: R('INVALID_INPUT', 'INVALID_INPUT: Too many services in one request (at most ' + SVC_MAX + '). One appointment is for ONE person; book each person separately.') };
+    for (const t of items) {
+      const ks = svcLookup(idx, t);
+      if (ks.length === 1) { if (keys.indexOf(ks[0]) < 0) keys.push(ks[0]); } else if (ks.length > 1) ambiguous.push({ t, ks }); else unknown.push(t);
+    }
+    const nm = (k) => idx.byKey[k].name;
+    if (unknown.length) return { error: R('SERVICE_UNKNOWN', 'SERVICE_UNKNOWN: "' + unknown.map((t) => t.slice(0, 40)).join('", "') + '" is not a service of this salon, so nothing was checked or booked. Never invent a service, price or duration: tell the customer which services in SERVICES & PRICES come closest and ask which one they want, then call this tool again with its key.') };
+    if (ambiguous.length) return { error: R('SERVICE_AMBIGUOUS', 'SERVICE_AMBIGUOUS: ' + ambiguous.map((a) => '"' + a.t.slice(0, 40) + '" could mean ' + a.ks.map((k) => nm(k) + ' [' + k + ']').join(' or ')).join('; ') + '. Nothing was checked or booked. Ask the customer which one they mean (never guess), then call this tool again with that key.') };
+    // A selected service already contained in another selected service is not counted twice.
+    const included = [];
+    const counted = keys.filter((k) => {
+      const by = keys.find((o) => o !== k && svcContains(idx, o).indexOf(k) >= 0 && svcContains(idx, k).indexOf(o) < 0);
+      if (by) { included.push({ key: k, by }); return false; }
+      return true;
+    });
+    const minutes = counted.reduce((a, k) => a + Number(idx.byKey[k].duration), 0);
+    const price = counted.reduce((a, k) => a + Number(idx.byKey[k].price || 0), 0);
+    const from = counted.some((k) => idx.byKey[k].fromPrice);
+    const parts = counted.map((k) => nm(k) + ' (' + idx.byKey[k].duration + ' min' + (included.some((i) => i.by === k) ? ', already includes ' + included.filter((i) => i.by === k).map((i) => nm(i.key)).join(', ') : '') + ')');
+    const label = counted.map(nm).join(' + ');
+    const priceText = (from ? 'from ' : '') + svcPrice(price);
+    const text = 'Services: ' + parts.join(' + ') + ' = ' + minutes + ' minutes in total (calculated by the system from the price list); starting price ' + priceText + '.';
+    if (minutes > CFG.APPT_MAX_MIN) return { error: R('TOO_LONG', 'TOO_LONG: ' + text + ' That is more than the maximum of ' + CFG.APPT_MAX_MIN + ' minutes for one appointment, so nothing was checked or booked. Explain this to the customer and offer to book the services as two separate appointments (each one checked and booked on its own), or to choose fewer services.') };
+    return { keys, counted, included, minutes, label, priceText, text };
+  }
+  // The structured service field the booking system writes right after the owner field.
+  function svcFields(sv) { return 'Service: ' + sv.label + ' | Keys: ' + sv.keys.join(',') + ' | Duration: ' + sv.minutes + ' min'; }
+
   // ---------------------------------------------------------------- actions
   function act(s, phase, a) { s.phase = phase; s.step++; return a; }
   const HTTP = (s, phase, req) => act(s, phase, { type: 'http', req });
@@ -444,11 +536,14 @@ function createEngine(CFG, CONF) {
   // ================================================================ BOOK
   H['B.start'] = (s, r, now) => {
     const c = s.ctx;
-    const st = parseDateTime(c.start_datetime), en = parseDateTime(c.end_datetime);
-    if (!Number.isFinite(st) || !Number.isFinite(en) || en <= st) {
-      return DONE(s, R('INVALID_INPUT', 'INVALID_INPUT: The appointment start and/or end time is missing or invalid. Ask the customer to confirm the exact date and time, then call this tool again.'));
+    // The length comes ONLY from the catalogue: any end time / duration a caller sends is ignored.
+    const sv = resolveServices(c.service_keys);
+    if (sv.error) return DONE(s, sv.error);
+    const st = parseDateTime(c.start_datetime);
+    if (!Number.isFinite(st)) {
+      return DONE(s, R('INVALID_INPUT', 'INVALID_INPUT: The appointment start time is missing or invalid. Ask the customer to confirm the exact date and time, then call this tool again.'));
     }
-    if (en - st > CFG.APPT_MAX_MIN * 60000) return DONE(s, R('INVALID_INPUT', 'INVALID_INPUT: The appointment is longer than ' + CFG.APPT_MAX_MIN + ' minutes, which is not allowed. Use the service duration from the salon information.'));
+    const en = st + sv.minutes * 60000;
     const summary = cleanSummary(c.summary);
     const cu = customerCtx(c);
     if (cu.error && cu.error !== 'none') return DONE(s, BAD_KEY());
@@ -460,7 +555,7 @@ function createEngine(CFG, CONF) {
     const idn = isChannelKey(cu) ? keyIdnOf(cu, 'chat', false) : idnOf(phone, 'chat', false);
     // Owner field: "Customer: <key>" for Messenger / Instagram, "Phone: <digits>" for WhatsApp (unchanged).
     const hdr = isChannelKey(cu) ? 'Customer: ' + cu.key : 'Phone: ' + phone;
-    s.b = { s: st, e: en, summary, phone, hdr, notes: String(c.notes == null ? '' : c.notes), idn, k: idn.k, sh: fnv(normName(summary)), ins: 0, chk: 0, rb: 0, gone: [] };
+    s.b = { s: st, e: en, summary, phone, hdr, svc: svcFields(sv), svcText: sv.text, notes: String(c.notes == null ? '' : c.notes), idn, k: idn.k, sh: fnv(normName(summary)), ins: 0, chk: 0, rb: 0, gone: [] };
     return lockStart(s, 'B.list', now);
   };
   H['B.list'] = (s) => { const a = dayStart(s.b.s); return listStart(s, 'day', a, a + DAY, 'B.decide'); };
@@ -501,7 +596,7 @@ function createEngine(CFG, CONF) {
   function bookBody(b) {
     return {
       id: b.id, summary: b.summary,
-      description: (b.hdr || 'Phone: ' + b.phone) + '. Notes: ' + b.notes,
+      description: (b.hdr || 'Phone: ' + b.phone) + '. ' + (b.svc ? b.svc + '. ' : '') + 'Notes: ' + b.notes,
       start: { dateTime: isoLocal(b.s), timeZone: CFG.TIMEZONE },
       end: { dateTime: isoLocal(b.e), timeZone: CFG.TIMEZONE },
     };
@@ -542,7 +637,7 @@ function createEngine(CFG, CONF) {
   };
   H['B.ok'] = (s, r, now) => {
     s.jadd = [{ o: 'c', i: s.b.id, s: s.b.s, e: s.b.e, k: s.b.k, sh: s.b.sh, at: now }];
-    return finish(s, R('SUCCESS', 'SUCCESS: Booked "' + s.b.summary + '" on ' + fmtLocal(s.b.s) + '.', { eventId: s.b.id }));
+    return finish(s, R('SUCCESS', 'SUCCESS: Booked "' + s.b.summary + '" on ' + fmtLocal(s.b.s) + '-' + hm(s.b.e) + '.' + (s.b.svcText ? ' ' + s.b.svcText : ''), { eventId: s.b.id }));
   };
   // Defense in depth: something outside the mutex (a manual staff edit) took
   // the slot concurrently. Undo our own insert rather than double-book.
@@ -1164,7 +1259,7 @@ function createEngine(CFG, CONF) {
   }
   return {
     init, step,
-    _t: { parseDateTime, parseYmd, parseHm, fmtLocal, isoLocal, localMs, ymd, hm, slotRule, endRule, identity, busyView, matchView, phoneMatches, allDayBlock, normPhone, chatLockId: chatLockIdFor, customerOf, customerCtx, ownerKeyOf, cls, lp },
+    _t: { parseDateTime, parseYmd, parseHm, fmtLocal, isoLocal, localMs, ymd, hm, slotRule, endRule, identity, busyView, matchView, phoneMatches, allDayBlock, normPhone, chatLockId: chatLockIdFor, customerOf, customerCtx, ownerKeyOf, cls, lp, resolveServices, normSvc, svcFields },
   };
 }
 if (typeof module !== 'undefined' && module.exports) module.exports = { createEngine };

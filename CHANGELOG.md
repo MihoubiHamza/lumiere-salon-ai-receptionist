@@ -1,5 +1,43 @@
 # CHANGELOG — Lumière Hair & Beauty Studio AI Receptionist
 
+## C1: the backend calculates appointment length from the service catalogue (2026-11-25)
+
+The AI is no longer authoritative for appointment length. Nothing was imported or published.
+
+- **Catalogue** (`salon-info.js`): every service has a stable canonical `key`, `aliases` (common names in English, French, Spanish and Arabic) and `includes`:
+  - the women's haircut & styling includes the blow-dry;
+  - the hair treatment includes the blow-dry;
+  - the full colour includes the root colour;
+  - the gel manicure includes the manicure.
+
+  An alias shared by several services ("haircut", "colour", "nails", "coupe", "قص", …) is ambiguous on purpose. No new service was added (there is no 45-minute cut & blow-dry).
+- **Engine** (`resolveServices`): resolves `service_keys`. These can be keys, official names or aliases, as a comma-separated list or a JSON array.
+  - Matching is exact after normalisation (case, accents, Arabic diacritics and hamza forms, punctuation), never fuzzy.
+  - Unknown → `SERVICE_UNKNOWN`; ambiguous → `SERVICE_AMBIGUOUS` (lists the candidates); missing → `SERVICE_REQUIRED`. The backend never picks a default service.
+  - A selected service already included in another selected service is not counted twice. Balayage (180) + women's haircut & styling (60, blow-dry included) = **240 minutes**, not 270.
+  - A total over 240 minutes is refused with `TOO_LONG`.
+  - The result states every service, the total and the starting price.
+- **Book_Appointment:**
+  - takes `service_keys` instead of `end_datetime`;
+  - the end time is start + catalogue total, and an end time or duration sent by a caller is ignored;
+  - the event description now carries the service line written by the engine, right after the unchanged owner field: `Phone: … / Customer: …. Service: <names> | Keys: <keys> | Duration: <min> min. Notes: …`.
+- **Check_Availability:**
+  - takes `service_keys` instead of `duration_minutes`;
+  - FREE / BUSY / OUTSIDE_HOURS are computed for the whole catalogue total;
+  - a specific time without any service now returns `SERVICE_REQUIRED` (no silent 30-minute default). Times outside opening hours are still reported first;
+  - a date-only check without services lists the day's busy periods but no start-time list.
+- **Website demo:**
+  - the Demo Input Guard no longer turns an unknown service into the first service of the menu;
+  - the separate `service` field is gone (the shared `service_keys` field is used);
+  - DEMO CONFIG carries the catalogue for the engine (the engine fails closed without it);
+  - the live website page (`site/`, `deploy/`) is unchanged.
+- **Prompt:**
+  - SERVICES & PRICES shows each service's `[key]` and what it already includes;
+  - the rules tell the AI to pass the keys and read back the system's total;
+  - the build refuses a prompt that still asks for `duration_minutes` or `end_datetime`.
+- **Unchanged:** WhatsApp, Messenger and Instagram owner fields and confirmation safeguards. The three channels are rebuilt, not deployed.
+- **Tests:** new `tests/services.test.js` (SV1–SV11); website demo C12; existing tests now pass `service_keys`. `npm test`: 15 suites, 265 tests.
+
 ## Fixes from the website production test: false fallback after a confirmed change, atomic rate limits (2026-11-25)
 
 Both defects were reproduced by new tests on the previous code before they were fixed. Nothing was imported or published.

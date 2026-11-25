@@ -200,4 +200,7 @@ async function runAll(env, tasks) {
 }
 const at = (env, ms, fn) => async () => { await env.sim.sleep(ms); return fn(); };
 
-module.exports = { makeEnv, callTool, callConfirmed, CONF, deliver, waMessage, runAll, at, wf, mutate, CFG, START, STAFF, ROOT, FILES, KillSignal, _mainHooks: mainHooks };
+// A catalogue service (salon-info.js) of a given length in minutes, for tests that only care about the length.
+const SVC_FOR = { 30: 'mens_cut', 45: 'manicure', 60: 'womens_cut', 90: 'root_colour', 120: 'full_colour', 150: 'keratin', 180: 'balayage', 240: 'balayage,womens_cut' };
+const svcFor = (min) => { if (!SVC_FOR[min]) throw new Error('no catalogue service of ' + min + ' min'); return SVC_FOR[min]; };
+module.exports = { svcFor, makeEnv, callTool, callConfirmed, CONF, deliver, waMessage, runAll, at, wf, mutate, CFG, START, STAFF, ROOT, FILES, KillSignal, _mainHooks: mainHooks };

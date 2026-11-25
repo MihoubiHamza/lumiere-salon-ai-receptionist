@@ -3,6 +3,7 @@
 // salon environment file). tools/build-workflows.js injects these values into
 // every workflow; after editing, run the builds (README.md) and re-import.
 const ENV = require('../lumiere.config.js');
+const SALON = require('../salon-info.js');
 module.exports = {
   // Calendar that holds the salon's appointments, and the one that holds the
   // system lock events (dated 2000-01-01, transparent, invisible in normal use).
@@ -21,8 +22,12 @@ module.exports = {
   WORK_START: '09:00',
   WORK_END: '19:00',
   CLOSED_WEEKDAY: 0, // 0 = Sunday ... 6 = Saturday (JS getUTCDay()); -1 = open every day
-  APPT_DEFAULT_MIN: 30, // used when a service has no known duration
+  APPT_DEFAULT_MIN: 30, // slot step / length of calendar events that have no end time
   APPT_MAX_MIN: 240, // longest single appointment (balayage is 180 min in the demo menu)
+  // The service catalogue (keys, durations, inclusions, aliases) from salon-info.js:
+  // the ONLY source of an appointment's length (tools send service keys, never a duration).
+  SERVICE_CATALOG: SALON.services.map((s) => ({ key: s.key, name: s.name, name_fr: s.name_fr, name_es: s.name_es, name_ar: s.name_ar, duration: s.duration, price: s.price, fromPrice: !!s.fromPrice, includes: s.includes || [], aliases: s.aliases || [] })),
+  CURRENCY_SYMBOL: SALON.currencySymbol,
 
   // Voice notes (Cohere Transcribe). Cohere has NO automatic language
   // detection, so voice notes are SUPPORTED ONLY IN VOICE_LANGUAGE. The AI is

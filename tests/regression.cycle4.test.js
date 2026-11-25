@@ -102,7 +102,7 @@ test('Z4 runner crash DURING the release -> one normal reply, no fallback, no lo
 
 test('Z5 runner crash inside Book_Appointment -> ERROR_NEEDS_STAFF (never a success), calendar recovers', async () => {
   const env = H.makeEnv({ seed: 440 });
-  const bk = (phone, time, summary) => ({ start_datetime: DAY + 'T' + time + ':00', end_datetime: DAY + 'T' + time.slice(0, 3) + '30:00', summary, notes: 'Patient: ' + summary, phone_number: phone });
+  const bk = (phone, time, summary) => ({ start_datetime: DAY + 'T' + time + ':00', service_keys: 'mens_cut', summary, notes: 'Patient: ' + summary, phone_number: phone });
   for (const k of [1, 3, 5]) {
     let done = false;
     const onNode = (name, run) => { if (!done && name === 'Engine: Decide' && runsOf(run, name) === k) { done = true; throw new Error('Node execution failed'); } };

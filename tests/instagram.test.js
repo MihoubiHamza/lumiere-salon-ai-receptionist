@@ -583,7 +583,7 @@ function toolIdent(run, tool) {
   const v = run.nodes.get(tool).parameters.workflowInputs.value, ctx = run.exprCtx(null, 0, []);
   return { phone_number: run.evalExpr(v.phone_number, ctx), customer_key: run.evalExpr(v.customer_key, ctx) };
 }
-const slot = (ident, name, time) => Object.assign({ start_datetime: '2026-10-06T' + (time || '10:00') + ':00', end_datetime: '2026-10-06T' + (time || '10:00').replace(/:00$/, ':30') + ':00', summary: name + ' - Haircut', notes: 'Instagram - Tel: +34600000009 | ' + name }, ident);
+const slot = (ident, name, time) => Object.assign({ start_datetime: '2026-10-06T' + (time || '10:00') + ':00', service_keys: 'mens_cut', summary: name + ' - Haircut', notes: 'Instagram - Tel: +34600000009 | ' + name }, ident);
 const findIn = (ident) => Object.assign({ phone_number: '', patient_name: '', appointment_date: '', booked_phone_number: '' }, ident);
 
 test('I12 an Instagram booking belongs to that Instagram conversation only (not Messenger, WhatsApp, another account, bare digits)', async () => {
@@ -600,7 +600,7 @@ test('I12 an Instagram booking belongs to that Instagram conversation only (not 
   assert.ok(/^SUCCESS/.test(e.rec.ai[0].res), e.rec.ai[0].res);
   const evs = e.cal.events(CFG.CALENDAR_ID);
   assert.strictEqual(evs.length, 1);
-  assert.ok(evs[0].description.indexOf('Customer: ' + IK(A) + '. Notes: Instagram - Tel: +34600000009') === 0, evs[0].description);
+  assert.ok(evs[0].description.indexOf('Customer: ' + IK(A) + '. Service: Men\'s haircut | Keys: mens_cut | Duration: 30 min. Notes: Instagram - Tel: +34600000009') === 0, evs[0].description);
   await all(e, [() => post(e, [ev(e, A, { text: 'find' })]), () => post(e, [ev(e, B, { text: 'find' })]), () => deliver(e, waMessage(e, WAP, { text: 'find' }))]);
   noErrors(e);
   assert.ok(/^FOUND: 1\) Lina Haddad - Haircut on 2026-10-06 at 10:00/.test(found[A]), found[A]);

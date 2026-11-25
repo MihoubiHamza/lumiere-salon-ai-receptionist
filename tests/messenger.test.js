@@ -542,7 +542,7 @@ function toolIdent(run, tool) {
   const v = run.nodes.get(tool).parameters.workflowInputs.value, ctx = run.exprCtx(null, 0, []);
   return { phone_number: run.evalExpr(v.phone_number, ctx), customer_key: run.evalExpr(v.customer_key, ctx) };
 }
-const slot = (ident, name) => Object.assign({ start_datetime: '2026-10-06T10:00:00', end_datetime: '2026-10-06T10:30:00', summary: name + ' - Kashf', notes: 'Messenger - Tel: 0555000009 | ' + name },
+const slot = (ident, name) => Object.assign({ start_datetime: '2026-10-06T10:00:00', service_keys: 'mens_cut', summary: name + ' - Kashf', notes: 'Messenger - Tel: 0555000009 | ' + name },
   typeof ident === 'string' ? { phone_number: ident } : ident);
 
 test('M15 a Messenger booking belongs to that Messenger conversation: found from it, invisible to others', async () => {
@@ -559,7 +559,7 @@ test('M15 a Messenger booking belongs to that Messenger conversation: found from
   assert.ok(/^SUCCESS/.test(e.rec.ai[0].res), e.rec.ai[0].res);
   const evs = e.cal.events(CFG.CALENDAR_ID);
   assert.strictEqual(evs.length, 1);
-  assert.ok(evs[0].description.indexOf('Customer: ' + FK(A) + '. Notes: Messenger - Tel: 0555000009') === 0, evs[0].description);
+  assert.ok(evs[0].description.indexOf('Customer: ' + FK(A) + '. Service: Men\'s haircut | Keys: mens_cut | Duration: 30 min. Notes: Messenger - Tel: 0555000009') === 0, evs[0].description);
   await all(e, [() => post(e, [ev(e, A, { text: 'find' })]), () => post(e, [ev(e, B, { text: 'find' })]), () => deliver(e, waMessage(e, WAP, { text: 'find' }))]);
   noErrors(e);
   assert.ok(/^FOUND: 1\) Sara Benali - Kashf on 2026-10-06 at 10:00/.test(found[A]), found[A]);

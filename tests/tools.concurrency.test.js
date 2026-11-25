@@ -4,13 +4,13 @@
 const assert = require('assert');
 const H = require('./lib/harness');
 const { test, runTests } = require('./lib/t');
-const { CFG, callTool, runAll, at, makeEnv, KillSignal } = H;
+const { CFG, callTool, runAll, at, makeEnv, KillSignal, svcFor } = H;
 const CAL = CFG.CALENDAR_ID, LOCKCAL = CFG.LOCK_CALENDAR_ID;
 
 const DAY = '2026-10-06'; // Tuesday
 const bk = (phone, time, summary, o) => Object.assign({
   start_datetime: (o && o.date || DAY) + 'T' + time + ':00',
-  end_datetime: (o && o.date || DAY) + 'T' + addMin(time, (o && o.dur) || 30) + ':00',
+  service_keys: svcFor((o && o.dur) || 30),
   summary, notes: 'Patient: ' + summary, phone_number: phone,
 }, o && o.extra);
 function addMin(t, m) { const [h, mi] = t.split(':').map(Number); const x = h * 60 + mi + m; return String(Math.floor(x / 60)).padStart(2, '0') + ':' + String(x % 60).padStart(2, '0'); }
@@ -163,7 +163,7 @@ test('B8 outside hours / past / malformed input rejected without touching the ca
     () => callTool(env, 'book', bk('213555000001', '19:00', 'A - x')),
     () => callTool(env, 'book', bk('213555000001', '08:30', 'A - x')),
     () => callTool(env, 'book', bk('213555000001', '10:00', 'A - x', { date: '2026-10-01' })),
-    () => callTool(env, 'book', { start_datetime: '2026-10-06T25:00:00', end_datetime: '2026-10-06T10:30:00', summary: 'A', phone_number: '213555000001' }),
+    () => callTool(env, 'book', { start_datetime: '2026-10-06T25:00:00', service_keys: 'mens_cut', summary: 'A', phone_number: '213555000001' }),
     () => callTool(env, 'book', bk('213555000001', '10:00', '')),
     () => callTool(env, 'book', bk('213555000001', '17:00', 'Long - Balayage', { dur: 180 })), // would end 20:00, after closing
     () => callTool(env, 'book', bk('213555000001', '10:00', 'Sun - x', { date: '2026-10-11' })), // Sunday: salon closed
@@ -465,23 +465,23 @@ test('F1 Find: own appointments only; bare name and typed booking number refused
 
 test('F2 Check_Availability never leaks other customers\' names; knows past times, Sunday closing and service length', async () => {
   const env = makeEnv({ seed: 50 });
-  seedAppt(env, 'apptone1', '213555000001', DAY, '10:00', 'Sara Benali - Balayage');
+  seedAppt(env, 'apptone1', '213555000001', DAY, '10:00', 'Sara Benali - Keratin');
   const rs = await runAll(env, [
-    () => callTool(env, 'check', { requested_date: DAY, requested_time: '10:00' }),
+    () => callTool(env, 'check', { requested_date: DAY, requested_time: '10:00', service_keys: 'mens_cut' }),
     () => callTool(env, 'check', { requested_date: DAY, requested_time: '' }),
-    () => callTool(env, 'check', { requested_date: DAY, requested_time: '11:00' }),
-    () => callTool(env, 'check', { requested_date: '2026-10-05', requested_time: '08:30' }),
-    () => callTool(env, 'check', { requested_date: '2026-10-09', requested_time: '10:00' }),
+    () => callTool(env, 'check', { requested_date: DAY, requested_time: '11:00', service_keys: 'mens_cut' }),
+    () => callTool(env, 'check', { requested_date: '2026-10-05', requested_time: '08:30', service_keys: 'mens_cut' }),
+    () => callTool(env, 'check', { requested_date: '2026-10-09', requested_time: '10:00', service_keys: 'mens_cut' }),
     () => callTool(env, 'check', { requested_date: '2026-10-01', requested_time: '' }),
-    () => callTool(env, 'check', { requested_date: '2026-10-11', requested_time: '10:00' }), // Sunday
-    () => callTool(env, 'check', { requested_date: DAY, requested_time: '09:00', duration_minutes: '90' }), // overlaps 10:00
-    () => callTool(env, 'check', { requested_date: DAY, requested_time: '16:30', duration_minutes: '180' }), // ends 19:30
-    () => callTool(env, 'check', { requested_date: DAY, requested_time: '16:00', duration_minutes: '180' }), // ends 19:00
+    () => callTool(env, 'check', { requested_date: '2026-10-11', requested_time: '10:00', service_keys: 'mens_cut' }), // Sunday
+    () => callTool(env, 'check', { requested_date: DAY, requested_time: '09:00', service_keys: 'root_colour' }), // overlaps 10:00
+    () => callTool(env, 'check', { requested_date: DAY, requested_time: '16:30', service_keys: 'balayage' }), // ends 19:30
+    () => callTool(env, 'check', { requested_date: DAY, requested_time: '16:00', service_keys: 'balayage' }), // ends 19:00
   ]);
   assert.deepStrictEqual(rs.map(status), ['BUSY', 'HAS_EVENTS', 'FREE', 'OUTSIDE_HOURS', 'FREE', 'PAST_DATE', 'CLOSED_DAY', 'BUSY', 'OUTSIDE_HOURS', 'FREE']);
-  for (const r of rs) assert.ok(r.result.indexOf('Sara') < 0 && r.result.indexOf('Balayage') < 0, 'privacy leak: ' + r.result);
-  assert.ok(/latest start for this service is 16:00/.test(rs[8].result), rs[8].result);
-  const [past] = await runAll(env, [() => callTool(env, 'check', { requested_date: '2026-10-05', requested_time: '09:30' })]);
+  for (const r of rs) assert.ok(r.result.indexOf('Sara') < 0 && r.result.indexOf('Keratin') < 0, 'privacy leak: ' + r.result);
+  assert.ok(/latest start for these services is 16:00/.test(rs[8].result), rs[8].result);
+  const [past] = await runAll(env, [() => callTool(env, 'check', { requested_date: '2026-10-05', requested_time: '09:30', service_keys: 'mens_cut' })]);
   env.sim.now; // start is 08:00 local, so 09:30 today is still in the future
   assert.strictEqual(status(past), 'FREE', past.result);
 });
@@ -489,7 +489,7 @@ test('F2 Check_Availability never leaks other customers\' names; knows past time
 test('F3 Check_Availability agrees with Book_Appointment on every hour boundary and service length', async () => {
   const env = makeEnv({ seed: 51 });
   for (const [t, dur] of [['08:59', 30], ['09:00', 30], ['12:30', 30], ['18:30', 30], ['18:45', 30], ['19:00', 30], ['16:00', 180], ['16:30', 180], ['18:00', 60], ['18:15', 60]]) {
-    const [c] = await runAll(env, [() => callTool(env, 'check', { requested_date: '2026-10-07', requested_time: t, duration_minutes: String(dur) })]);
+    const [c] = await runAll(env, [() => callTool(env, 'check', { requested_date: '2026-10-07', requested_time: t, service_keys: svcFor(dur) })]);
     const [b] = await runAll(env, [() => callTool(env, 'book', bk('2135551' + t.replace(':', '') + dur, t, 'H' + t + ' - x', { date: '2026-10-07', dur }))]);
     const cOk = status(c) === 'FREE', bOk = status(b) === 'SUCCESS';
     assert.strictEqual(cOk, bOk, t + '/' + dur + ': check=' + c.result + ' book=' + b.result);

@@ -7,7 +7,7 @@ const { test, runTests } = require('./lib/t');
 const { CFG, callTool, runAll, makeEnv, deliver, waMessage } = H;
 const CAL = CFG.CALENDAR_ID;
 const DAY = '2026-10-06';
-const book = (phone, time, summary) => ({ start_datetime: DAY + 'T' + time + ':00', end_datetime: DAY + 'T' + time.replace(/:00$/, ':30') + ':00', summary, notes: '', phone_number: phone });
+const book = (phone, time, summary) => ({ start_datetime: DAY + 'T' + time + ':00', service_keys: 'mens_cut', summary, notes: '', phone_number: phone });
 const cancel = (phone, time, extra) => Object.assign({ appointment_date: DAY, appointment_time: time, phone_number: phone, patient_name: '', booked_phone_number: '' }, extra);
 const events = (env) => env.cal.events(CAL);
 
@@ -59,7 +59,7 @@ test('X4 an all-day event marked Busy blocks booking that day; a Free all-day no
   const rs = await runAll(env, [
     () => callTool(env, 'book', book('213555000001', '10:00', 'A - x')),
     () => callTool(env, 'check', { requested_date: DAY, requested_time: '10:00' }),
-    () => callTool(env, 'book', Object.assign(book('213555000002', '10:00', 'B - x'), { start_datetime: '2026-10-07T10:00:00', end_datetime: '2026-10-07T10:30:00' })),
+    () => callTool(env, 'book', Object.assign(book('213555000002', '10:00', 'B - x'), { start_datetime: '2026-10-07T10:00:00' })),
   ]);
   assert.ok(/^CLOSED_DAY/.test(rs[0].result), rs[0].result);
   assert.ok(/^CLOSED_DAY/.test(rs[1].result), rs[1].result);

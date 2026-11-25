@@ -42,7 +42,7 @@ All 6 workflows import **inactive**, with their own fixed IDs (`lumWebDemo…`),
 
 - **Removed:** WhatsApp trigger and every WhatsApp send, staff alerts and `!unmute`, pause/handoff (Sheets), voice (Cohere), Escalate to Staff, conversation log (Sheets), Get Clinic Info, error workflow.
 - **Added:** Website Webhook (POST, CORS limited to `https://hamzamihoubi.com`), DEMO CONFIG, Validate & Rate Limit, Safety Gate, Build Web Reply, the Respond nodes, and the daily cleanup.
-- **Book:** Demo Input Guard (title forced to `DEMO - <name>`, notes = service only), and a limit of 2 bookings per session.
+- **Book:** Demo Input Guard (title forced to `DEMO - <name>`, no free-text notes), and a limit of 2 bookings per session. The services (`service_keys`) are resolved by the engine from the catalogue in DEMO CONFIG; an unknown or ambiguous service is refused, never replaced by a default.
 - **Kept as is:** chat lock + calendar write lock engine, Sanitize AI Output checks, the prompt rules (calendar cheat-sheet, strict day calculation, grounding, no fake confirmations…), memory window, tool logic, service durations and the closing-time rule.
 - **Additions inside the copies only:** an optional break (`LUNCH_START`/`LUNCH_END`, empty = no break), and a `FREE_SLOTS:` list in Check_Availability results for the requested service length (used for the time-slot chips).
 - **Identity:** a 15-digit pseudo-ID hashed from the `sessionId` takes the place of the phone number (memory key, chat lock, appointment owner).
@@ -62,7 +62,7 @@ Days below are relative: "Tuesday" means the next Tuesday. Sunday is the closed 
 | FR | `Bonjour, je voudrais prendre rendez-vous pour une coloration.` → `Claire Demo` → `mardi` → tap a time | Same, in French; a full colour blocks 120 min |
 | AR | `أريد حجز موعد لقص الشعر` → `سامي ديمو` → `الثلاثاء` → tap a time | Same, in Modern Standard Arabic |
 
-**Calendar after:** `DEMO - <name>` events whose length matches the service (e.g. 60 min for a women's haircut, 120 min for a full colour). Each description reads `Phone: 9…(15 digits). Notes: Website demo | Service: …`, with no other text.
+**Calendar after:** `DEMO - <name>` events whose length matches the service (e.g. 60 min for a women's haircut, 120 min for a full colour). Each description reads `Phone: 9…(15 digits). Service: <names> | Keys: <keys> | Duration: <min> min. Notes: Website demo`, with no other text. The length is the backend total of the chosen services (e.g. balayage + women's haircut = 240 min).
 
 ### 2. Prices, services and hours
 | | Visitor types | Yasmine should |

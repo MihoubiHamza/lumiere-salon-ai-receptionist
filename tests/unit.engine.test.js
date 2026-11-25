@@ -88,7 +88,7 @@ test('U5 journal views: busy view is conservative, match view applies the bot\'s
 
 test('U6 engine refuses to continue after done and on unknown phases', () => {
   const eng = createEngine(CFG);
-  const s = eng.init('book', { start_datetime: '2026-10-09T23:00', end_datetime: '2026-10-09T23:30', summary: 'x', phone_number: '213555000001' }, NOW, '1', Math.random);
+  const s = eng.init('book', { start_datetime: '2026-10-09T23:00', service_keys: 'mens_cut', summary: 'x', phone_number: '213555000001' }, NOW, '1', Math.random);
   const out = eng.step(s, null, NOW, Math.random);
   assert.strictEqual(out.action.type, 'done');
   assert.throws(() => eng.step(out.state, null, NOW, Math.random), /after done/);
@@ -98,7 +98,7 @@ test('U6 engine refuses to continue after done and on unknown phases', () => {
 test('U7 corrupted lock-object state is treated as free and self-heals', async () => {
   const env = H.makeEnv({ seed: 201 });
   env.cal.seed(CFG.LOCK_CALENDAR_ID, { id: CFG.CAL_LOCK_ID, summary: 'lock', description: '{{{ not json', start: { dateTime: '2000-01-01T00:00:00Z' }, end: { dateTime: '2000-01-01T00:01:00Z' } });
-  const [r] = await H.runAll(env, [() => H.callTool(env, 'book', { start_datetime: '2026-10-06T10:00:00', end_datetime: '2026-10-06T10:30:00', summary: 'A - x', notes: '', phone_number: '213555000001' })]);
+  const [r] = await H.runAll(env, [() => H.callTool(env, 'book', { start_datetime: '2026-10-06T10:00:00', service_keys: 'mens_cut', summary: 'A - x', notes: '', phone_number: '213555000001' })]);
   assert.ok(/^SUCCESS/.test(r.result), r.result);
   assert.strictEqual(env.cal.lockState(CFG.LOCK_CALENDAR_ID, CFG.CAL_LOCK_ID).v, 1);
 });
@@ -106,7 +106,7 @@ test('U7 corrupted lock-object state is treated as free and self-heals', async (
 test('U8 lock event deleted by a human is resurrected via CAS, not bypassed', async () => {
   const env = H.makeEnv({ seed: 202 });
   env.cal.seed(CFG.LOCK_CALENDAR_ID, { id: CFG.CAL_LOCK_ID, status: 'cancelled', summary: 'lock', description: '{"v":1}', start: { dateTime: '2000-01-01T00:00:00Z' }, end: { dateTime: '2000-01-01T00:01:00Z' } });
-  const [r] = await H.runAll(env, [() => H.callTool(env, 'book', { start_datetime: '2026-10-06T10:00:00', end_datetime: '2026-10-06T10:30:00', summary: 'A - x', notes: '', phone_number: '213555000001' })]);
+  const [r] = await H.runAll(env, [() => H.callTool(env, 'book', { start_datetime: '2026-10-06T10:00:00', service_keys: 'mens_cut', summary: 'A - x', notes: '', phone_number: '213555000001' })]);
   assert.ok(/^SUCCESS/.test(r.result), r.result);
   assert.strictEqual(env.cal.store(CFG.LOCK_CALENDAR_ID).get(CFG.CAL_LOCK_ID).cur.status, 'confirmed');
 });
@@ -115,7 +115,7 @@ test('U9 oversized lock state is capped, never exceeding the size budget', async
   const env = H.makeEnv({ seed: 203 });
   const j = Array.from({ length: 500 }, (_, i) => ({ o: 'c', i: 'x' + i, s: 1, e: 2, k: 'p:1', sh: 'aa', at: H.START - 1000 + i }));
   env.cal.seed(CFG.LOCK_CALENDAR_ID, { id: CFG.CAL_LOCK_ID, summary: 'lock', description: JSON.stringify({ v: 1, j }), start: { dateTime: '2000-01-01T00:00:00Z' }, end: { dateTime: '2000-01-01T00:01:00Z' } });
-  const [r] = await H.runAll(env, [() => H.callTool(env, 'book', { start_datetime: '2026-10-06T10:00:00', end_datetime: '2026-10-06T10:30:00', summary: 'A - x', notes: '', phone_number: '213555000001' })]);
+  const [r] = await H.runAll(env, [() => H.callTool(env, 'book', { start_datetime: '2026-10-06T10:00:00', service_keys: 'mens_cut', summary: 'A - x', notes: '', phone_number: '213555000001' })]);
   assert.ok(/^SUCCESS/.test(r.result), r.result);
   const desc = env.cal.store(CFG.LOCK_CALENDAR_ID).get(CFG.CAL_LOCK_ID).cur.description;
   assert.ok(desc.length <= CFG.LOCK_STATE_MAX_CHARS, 'lock state ' + desc.length + ' chars');
@@ -177,7 +177,7 @@ test('U11 appointment ownership: "Customer: <key>" belongs to that key only; leg
 
 test('U12 Book writes the owner field per channel: WhatsApp unchanged ("Phone:"), Messenger / Instagram "Customer: <key>", no phone needed', async () => {
   const env = H.makeEnv({ seed: 77 });
-  const slot = (t, extra) => Object.assign({ start_datetime: '2026-10-06T' + t + ':00', end_datetime: '2026-10-06T' + t.replace(':00', ':30') + ':00', summary: 'Lina - Haircut', notes: 'Lina' }, extra);
+  const slot = (t, extra) => Object.assign({ start_datetime: '2026-10-06T' + t + ':00', service_keys: 'mens_cut', summary: 'Lina - Haircut', notes: 'Lina' }, extra);
   const r = await H.runAll(env, [async () => [
     await H.callTool(env, 'book', slot('10:00', { phone_number: '213555123456', customer_key: 'wa:213555123456' })),
     await H.callTool(env, 'book', slot('11:00', { phone_number: '', customer_key: IGK })),
@@ -188,7 +188,9 @@ test('U12 Book writes the owner field per channel: WhatsApp unchanged ("Phone:")
   assert.ok(/^SUCCESS/.test(wa.result) && /^SUCCESS/.test(ig.result) && /^SUCCESS/.test(legacy.result), wa.result + ' / ' + ig.result + ' / ' + legacy.result);
   assert.ok(/^ERROR/.test(bad.result), 'invalid key fails closed: ' + bad.result);
   const d = env.cal.events(CFG.CALENDAR_ID).map((x) => x.description).sort();
-  assert.deepStrictEqual(d, ['Customer: ' + IGK + '. Notes: Lina', 'Phone: 213555123456. Notes: Lina', 'Phone: 213555123456. Notes: Lina']);
+  // Owner field first (unchanged), then the service line written by the engine from the catalogue.
+  const SV = '. Service: Men\'s haircut | Keys: mens_cut | Duration: 30 min. Notes: Lina';
+  assert.deepStrictEqual(d, ['Customer: ' + IGK + SV, 'Phone: 213555123456' + SV, 'Phone: 213555123456' + SV]);
 });
 
 // ---------------------------------------------------------------- 2026-11-25: atomic counters, completed-action record

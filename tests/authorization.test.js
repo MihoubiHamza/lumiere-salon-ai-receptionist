@@ -222,12 +222,12 @@ test('AZ8 cancellation and rescheduling authorization: confirmations are created
 
 test('AZ9 phone numbers stay contact information: Messenger / Instagram bookings keep "Tel:" in the notes, without any phone identity', async () => {
   const env = makeEnv({ seed: 808 });
-  const slot = (id, t, notes) => Object.assign({ start_datetime: DAY + 'T' + t + ':00', end_datetime: DAY + 'T' + t.replace(':00', ':30') + ':00', summary: 'Lina Haddad - Haircut', notes }, id);
+  const slot = (id, t, notes) => Object.assign({ start_datetime: DAY + 'T' + t + ':00', service_keys: 'mens_cut', summary: 'Lina Haddad - Haircut', notes }, id);
   const rs = [await one(env, () => callTool(env, 'book', slot(who.ig(SID), '10:00', 'Instagram - Tel: +34600000009 | Lina Haddad'))),
     await one(env, () => callTool(env, 'book', slot(who.fb(SID2), '11:00', 'Messenger - Tel: +34600000008 | Lucia')))];
   for (const r of rs) assert.ok(/^SUCCESS/.test(r.result), r.result);
   const d = env.cal.events(CAL).map((e) => e.description).sort();
-  assert.deepStrictEqual(d, ['Customer: ' + FB(SID2) + '. Notes: Messenger - Tel: +34600000008 | Lucia', 'Customer: ' + IG(SID) + '. Notes: Instagram - Tel: +34600000009 | Lina Haddad']);
+  assert.deepStrictEqual(d, ['Customer: ' + FB(SID2) + '. Service: Men\'s haircut | Keys: mens_cut | Duration: 30 min. Notes: Messenger - Tel: +34600000008 | Lucia', 'Customer: ' + IG(SID) + '. Service: Men\'s haircut | Keys: mens_cut | Duration: 30 min. Notes: Instagram - Tel: +34600000009 | Lina Haddad']);
   // The contact number in the notes grants nothing to the WhatsApp user who owns it.
   const f = await one(env, () => callTool(env, 'find', findIn(who.wa('34600000009'))));
   assert.ok(/^NOT_FOUND/.test(f.result) && !/Lina/.test(f.result), f.result);
