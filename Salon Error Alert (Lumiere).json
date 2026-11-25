@@ -1,0 +1,61 @@
+{
+  "name": "Salon Error Alert (Lumière)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "05d2632e-3493-3fbe-22e1-e37804546d05",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "={{ $env.LUMIERE_WHATSAPP_PHONE_NUMBER_ID }}",
+        "recipientPhoneNumber": "={{ $env.LUMIERE_STAFF_CHAT_ID }}",
+        "textBody": "={{ '⚠️ Lumière bot error - a customer may not have received a reply. Please check the conversations.\\n\\nWorkflow: ' + (($json.workflow && $json.workflow.name) || '?') + '\\nExecution: ' + (($json.execution && $json.execution.id) || '?') + '\\nNode: ' + (($json.execution && $json.execution.lastNodeExecuted) || '?') + '\\nError: ' + String(($json.execution && $json.execution.error && $json.execution.error.message) || ($json.trigger && $json.trigger.error && $json.trigger.error.message) || '?').slice(0, 300) + (($json.execution && $json.execution.url) ? '\\n' + $json.execution.url : '') }}",
+        "additionalFields": {}
+      },
+      "id": "b20288d5-ee74-dfc1-e27c-ff2af95c3dc1",
+      "name": "Alert Staff on WhatsApp",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        0
+      ],
+      "webhookId": "d9bde233-0c1e-8cfc-0396-459894664e6f",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "lumWaApi00000001",
+          "name": "LUMIERE - WhatsApp API"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Alert Staff on WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "id": "lumErrorAlert001",
+  "active": false
+}

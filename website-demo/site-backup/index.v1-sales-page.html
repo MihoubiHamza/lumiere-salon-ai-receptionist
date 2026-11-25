@@ -1,0 +1,2001 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lumière Hair &amp; Beauty Studio · AI Receptionist Demo</title>
+<meta name="description" content="Live demo of Yasmine, the AI receptionist for hair and beauty salons, set up for the fictional Lumière Hair &amp; Beauty Studio. She answers clients on WhatsApp, Messenger and your website, explains services and prices, and books, moves and cancels appointments in English, French, Spanish and Arabic.">
+<meta property="og:title" content="Lumière Hair &amp; Beauty Studio · AI Receptionist Demo">
+<meta property="og:description" content="Your clients message at midnight. Yasmine answers and books the appointment.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='16' fill='%2324161f'/><path d='M32 12c2.6 9.4 6.6 13.4 16 16-9.4 2.6-13.4 6.6-16 16-2.6-9.4-6.6-13.4-16-16 9.4-2.6 13.4-6.6 16-16Z' fill='%23e2b86b'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --night: #24161f;
+  --night-2: #33212d;
+  --night-3: #4a3242;
+  --paper: #faf6f3;
+  --white: #ffffff;
+  --ink: #2a1b24;
+  --ink-2: #5c4a54;
+  --ink-3: #8f7c86;
+  --line: #ece2dd;
+  --amber: #e2b86b;
+  --amber-soft: #f7ead2;
+  --wa: #00a884;
+  --wa-dark: #075e54;
+  --bubble: #d9fdd3;
+  --chat-bg: #efeae2;
+  --radius: 18px;
+  --font: "Readex Pro", "Segoe UI", Tahoma, system-ui, sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; padding: 0; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body {
+  font-family: var(--font);
+  font-weight: 400;
+  color: var(--ink);
+  background: var(--paper);
+  font-size: 17px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+:lang(ar) body, html[lang="ar"] body { line-height: 1.8; }
+img, svg { display: block; }
+a { color: inherit; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; border-radius: 6px; }
+.wrap { width: 100%; max-width: 1180px; margin-inline: auto; padding-inline: 24px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 15px 26px; border-radius: 999px; border: 0;
+  font-weight: 500; font-size: 1rem; text-decoration: none; white-space: nowrap;
+  transition: background-color .2s, color .2s, transform .2s;
+}
+.btn:active { transform: translateY(1px); }
+.btn-amber { background: var(--amber); color: var(--night); }
+.btn-amber:hover { background: #ebc888; }
+.btn-ghost { background: transparent; color: var(--white); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.35); }
+.btn-ghost:hover { box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.8); }
+.btn-ink { background: var(--ink); color: var(--white); }
+.btn-ink:hover { background: var(--night-3); }
+.btn svg { width: 20px; height: 20px; flex: none; }
+
+/* ---------- Header ---------- */
+.site-header {
+  position: fixed; inset-inline: 0; top: 0; z-index: 50;
+  padding-top: env(safe-area-inset-top, 0px);
+  color: var(--white);
+  transition: background-color .3s, color .3s, box-shadow .3s;
+}
+.site-header.scrolled { background: rgba(250,246,243,.92); color: var(--ink); box-shadow: 0 1px 0 var(--line); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.site-header .wrap { display: flex; align-items: center; gap: 28px; height: 72px; }
+.logo { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; font-size: 1.3rem; text-decoration: none; letter-spacing: -0.01em; }
+.logo-mark { width: 34px; height: 34px; }
+.main-nav { display: flex; gap: 26px; margin-inline-start: 12px; }
+.main-nav a { text-decoration: none; font-size: .95rem; opacity: .78; }
+.main-nav a:hover { opacity: 1; }
+.header-actions { margin-inline-start: auto; display: flex; align-items: center; gap: 12px; }
+.lang-select {
+  font: inherit; font-size: .92rem; color: inherit; background: transparent; border: 0; cursor: pointer;
+  padding: 8px 12px; border-radius: 999px; box-shadow: inset 0 0 0 1.5px currentColor; opacity: .85;
+}
+.lang-select:hover { opacity: 1; }
+.lang-select option { color: #2a1b24; }
+.logo-text { display: flex; flex-direction: column; line-height: 1.05; }
+.logo-text small { font-size: .62rem; font-weight: 400; letter-spacing: .12em; text-transform: uppercase; opacity: .75; margin-top: 3px; }
+.eyebrow { display: inline-block; font-size: .85rem; letter-spacing: .04em; color: var(--amber); margin-bottom: 18px; padding: 6px 12px; border-radius: 999px; box-shadow: inset 0 0 0 1px rgba(226,184,107,.5); }
+.header-actions .btn { padding: 11px 20px; font-size: .95rem; }
+.site-header.scrolled .btn-amber { background: var(--ink); color: var(--white); }
+
+/* ---------- Hero ---------- */
+.hero {
+  position: relative; overflow: hidden;
+  background: var(--night);
+  color: var(--white);
+  padding: calc(72px + 56px + env(safe-area-inset-top, 0px)) 0 96px;
+}
+.hero::before {
+  content: ""; position: absolute; width: 760px; height: 760px; border-radius: 50%;
+  inset-inline-end: -180px; top: -220px;
+  background: radial-gradient(circle, rgba(226,184,107,.22) 0%, rgba(226,184,107,.06) 38%, transparent 66%);
+  pointer-events: none;
+}
+.hero .wrap {
+  position: relative; display: grid;
+  grid-template-columns: minmax(0,1fr) minmax(0,440px);
+  grid-template-areas: "title chat" "copy chat";
+  grid-template-rows: auto 1fr; column-gap: 64px; align-items: start;
+}
+.hero-title { grid-area: title; padding-top: 24px; }
+.hero-copy { grid-area: copy; }
+.hero-chat { grid-area: chat; min-width: 0; }
+.hero h1 {
+  font-weight: 600;
+  font-size: clamp(2.3rem, 4.4vw, 3.6rem);
+  line-height: 1.07;
+  letter-spacing: -0.03em;
+  max-width: 17ch;
+}
+html[lang="ar"] .hero h1 { letter-spacing: 0; line-height: 1.3; max-width: 17ch; }
+.hero-lede { margin-top: 26px; font-size: 1.18rem; font-weight: 300; color: rgba(255,255,255,.82); max-width: 48ch; }
+.hero-ctas { margin-top: 36px; display: flex; flex-wrap: wrap; gap: 14px; }
+.hero-note { margin-top: 22px; font-size: .92rem; color: rgba(255,255,255,.6); display: flex; align-items: center; gap: 10px; }
+.hero-note svg { width: 18px; height: 18px; color: var(--amber); flex: none; }
+
+/* Live demo chat (hero) */
+.chat-intro { font-size: .95rem; color: rgba(255,255,255,.82); margin-bottom: 12px; }
+.live-chat {
+  display: flex; flex-direction: column; overflow: hidden;
+  height: clamp(420px, calc(100vh - 250px), 600px);
+  height: clamp(420px, calc(100svh - 250px), 600px);
+  border-radius: 22px; background: var(--chat-bg); color: #111b21;
+  box-shadow: 0 0 0 1px var(--night-3), 0 40px 80px -30px rgba(0,0,0,.6);
+}
+.live-chat :focus-visible { outline-color: var(--wa-dark); }
+.lc-bar { padding: 12px 14px; }
+.lc-bar strong { display: flex; align-items: center; gap: 8px; }
+.wa-bar .lc-badge { font-size: .7rem; font-weight: 600; line-height: 1; padding: 4px 7px; border-radius: 6px; background: var(--amber); color: var(--night); letter-spacing: .02em; opacity: 1; }
+.wa-bar .lc-status { display: flex; align-items: center; gap: 6px; opacity: .9; }
+.wa-bar .lc-status span { opacity: 1; }
+.lc-status i { width: 7px; height: 7px; border-radius: 50%; background: #25d366; flex: none; }
+.lc-langs { border: 0; min-width: 0; display: flex; gap: 6px; padding: 8px 10px; background: #f7f3ee; border-bottom: 1px solid #e3dcd2; }
+.lc-langs label { position: relative; flex: 1; }
+.lc-langs input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; margin: 0; cursor: pointer; }
+.lc-langs span { display: block; text-align: center; font-size: .82rem; padding: 6px 4px; border-radius: 999px; color: #3b4a54; box-shadow: inset 0 0 0 1px #d4cdc2; transition: background-color .2s, color .2s; }
+.lc-langs input:checked + span { background: var(--wa-dark); color: var(--white); box-shadow: none; }
+.lc-langs input:focus-visible + span { outline: 3px solid var(--wa-dark); outline-offset: 2px; }
+.lc-log { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 6px; padding: 14px 12px; }
+.lc-log > :first-child { margin-top: auto; }
+.lc-log .msg { font-size: .95rem; max-width: 86%; }
+.lc-text { white-space: pre-line; overflow-wrap: anywhere; }
+.lc-note {
+  align-self: center; max-width: 94%; text-align: center; font-size: .88rem; line-height: 1.5; color: #3d3216;
+  background: #fff7e3; border-radius: 10px; padding: 10px 12px; box-shadow: 0 1px 1px rgba(0,0,0,.08);
+  animation: pop .28s ease-out both;
+}
+.lc-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 10px; }
+.lc-actions a { display: inline-flex; align-items: center; min-height: 40px; padding: 8px 14px; border-radius: 999px; font-weight: 500; text-decoration: none; background: var(--wa-dark); color: var(--white); }
+.lc-actions a + a { background: var(--white); color: var(--wa-dark); box-shadow: inset 0 0 0 1.5px var(--wa-dark); }
+.lc-replies { display: flex; gap: 8px; overflow-x: auto; padding: 4px 10px 6px; scrollbar-width: none; }
+.lc-replies::-webkit-scrollbar { display: none; }
+.lc-replies:empty { display: none; }
+.lc-chip {
+  flex: none; min-height: 40px; padding: 8px 14px; border-radius: 999px; border: 0;
+  background: var(--white); color: var(--wa-dark); font-size: .9rem; box-shadow: inset 0 0 0 1px rgba(7,94,84,.35);
+}
+.lc-chip:hover { background: #e7f6f2; }
+.lc-chip:disabled, .lc-send:disabled { opacity: .5; cursor: not-allowed; }
+.lc-form { display: flex; align-items: center; gap: 8px; padding: 6px 10px 10px; }
+.lc-form input[type="text"] {
+  flex: 1; min-width: 0; height: 46px; padding: 0 16px; border: 0; border-radius: 999px;
+  background: var(--white); color: #111b21; font: inherit; font-size: 16px;
+  box-shadow: 0 1px 1px rgba(0,0,0,.08);
+}
+.lc-form input[type="text"]::placeholder { color: #667781; }
+.lc-form input[type="text"]:disabled { background: #f0f0f0; }
+.lc-send { width: 46px; height: 46px; flex: none; border: 0; border-radius: 50%; background: var(--wa-dark); color: var(--white); display: grid; place-items: center; }
+.lc-send svg { width: 20px; height: 20px; }
+.live-chat[dir="rtl"] .lc-send svg { transform: scaleX(-1); }
+.lc-hp { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); inset-inline-start: -9999px; }
+.chat-disclaimer { margin-top: 12px; display: flex; gap: 8px; align-items: flex-start; font-size: .85rem; line-height: 1.5; color: rgba(255,255,255,.72); }
+.chat-disclaimer svg { width: 16px; height: 16px; flex: none; margin-top: 3px; color: var(--amber); }
+.hero-more {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; width: max-content; margin: 22px auto 0;
+  font-size: .92rem; color: rgba(255,255,255,.82); text-decoration: none; padding: 4px 10px;
+}
+.hero-more:hover { color: var(--white); }
+.hero-more svg { width: 20px; height: 20px; animation: bob 1.8s ease-in-out infinite; }
+@keyframes bob { 0%, 100% { transform: none; } 50% { transform: translateY(4px); } }
+
+.phone {
+  position: relative; z-index: 2;
+  width: 100%; max-width: 300px;
+  background: #0a1128; border-radius: 42px; padding: 11px;
+  box-shadow: 0 0 0 1px var(--night-3), 0 40px 80px -30px rgba(0,0,0,.6);
+}
+.phone-screen { border-radius: 32px; overflow: hidden; background: var(--chat-bg); display: flex; flex-direction: column; height: 560px; }
+.wa-bar { background: var(--wa-dark); color: var(--white); display: flex; align-items: center; gap: 10px; padding: 16px 16px 12px; }
+.wa-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--amber); color: var(--night); display: grid; place-items: center; font-weight: 600; flex: none; }
+.wa-bar strong { display: block; font-size: .95rem; font-weight: 500; line-height: 1.2; }
+.wa-bar span { font-size: .78rem; opacity: .8; }
+.chat { flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-start; gap: 6px; padding: 14px 12px 16px; }
+.demo .chat { justify-content: flex-end; }
+.msg {
+  max-width: 84%; padding: 7px 10px 5px; border-radius: 10px; font-size: .92rem; line-height: 1.55;
+  box-shadow: 0 1px 1px rgba(0,0,0,.08); color: #111b21;
+  animation: pop .28s ease-out both;
+}
+.msg time { display: block; font-size: .68rem; color: #667781; text-align: end; margin-top: 1px; font-variant-numeric: tabular-nums; }
+.msg.client { align-self: flex-end; background: var(--bubble); border-start-end-radius: 3px; }
+.msg.bot { align-self: flex-start; background: var(--white); border-start-start-radius: 3px; }
+.msg.system {
+  align-self: center; max-width: 92%; text-align: center; font-size: .78rem; color: #54656f;
+  background: #fff7e3; border-radius: 8px; padding: 5px 10px; box-shadow: none;
+}
+.voice { display: flex; align-items: center; gap: 9px; min-width: 190px; padding-block: 3px; }
+.voice-play { width: 30px; height: 30px; border-radius: 50%; background: #3b4a54; color: var(--white); display: grid; place-items: center; flex: none; }
+.voice-play svg { width: 12px; height: 12px; }
+.wave { display: flex; align-items: center; gap: 2px; height: 26px; flex: 1; }
+.wave i { display: block; width: 3px; border-radius: 2px; background: #8696a0; }
+.voice-len { font-size: .72rem; color: #667781; }
+.typing { align-self: flex-start; background: var(--white); border-radius: 10px; border-start-start-radius: 3px; padding: 11px 14px; display: flex; gap: 4px; box-shadow: 0 1px 1px rgba(0,0,0,.08); }
+.typing i { width: 7px; height: 7px; border-radius: 50%; background: #8696a0; animation: blink 1s infinite; }
+.typing i:nth-child(2) { animation-delay: .15s; }
+.typing i:nth-child(3) { animation-delay: .3s; }
+.wa-input { display: flex; align-items: center; gap: 8px; padding: 8px 10px 14px; }
+.wa-input div { flex: 1; height: 38px; border-radius: 999px; background: var(--white); }
+.wa-input span { width: 38px; height: 38px; border-radius: 50%; background: var(--wa); flex: none; }
+@keyframes pop { from { opacity: 0; transform: translateY(6px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes blink { 0%, 100% { opacity: .3; } 50% { opacity: 1; } }
+
+/* ---------- Sections ---------- */
+.section { padding-block: 112px; }
+.section-head { max-width: 760px; margin-bottom: 56px; }
+.section h2 {
+  font-weight: 600; font-size: clamp(1.9rem, 3.4vw, 2.75rem);
+  line-height: 1.12; letter-spacing: -0.025em;
+}
+html[lang="ar"] .section h2, html[lang="ar"] .cta-band h2 { letter-spacing: 0; line-height: 1.35; }
+.section-lede { margin-top: 18px; font-size: 1.12rem; color: var(--ink-2); max-width: 56ch; font-weight: 300; }
+
+/* Pain */
+.pain { background: var(--white); }
+.pain h2 { max-width: 22ch; }
+.pain-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 40px; }
+.pain-item { border-top: 2px solid var(--ink); padding-top: 22px; }
+.pain-item h3 { font-weight: 500; font-size: 1.2rem; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
+.pain-item h3 svg { width: 22px; height: 22px; color: var(--ink-2); flex: none; }
+.pain-item p { color: var(--ink-2); }
+
+/* Demo */
+.demo { background: var(--paper); }
+.tabs { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 36px; }
+.tab {
+  background: var(--white); border: 0; box-shadow: inset 0 0 0 1px var(--line);
+  padding: 11px 18px; border-radius: 999px; font-size: .95rem; color: var(--ink-2);
+  transition: background-color .2s, color .2s, box-shadow .2s;
+}
+.tab:hover { color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink-3); }
+.tab[aria-selected="true"] { background: var(--ink); color: var(--white); box-shadow: none; }
+.demo-grid { display: grid; grid-template-columns: 360px minmax(0,1fr); gap: 48px; align-items: start; }
+.demo .phone { max-width: 360px; box-shadow: 0 30px 60px -30px rgba(14,23,51,.45); }
+.demo .phone-screen { height: 520px; }
+.salon-panel {
+  background: var(--night); color: var(--white); border-radius: 24px; padding: 34px;
+  min-height: 100%; display: flex; flex-direction: column;
+}
+.salon-panel h3 { font-weight: 500; font-size: 1.05rem; color: rgba(255,255,255,.65); margin-bottom: 26px; display: flex; align-items: center; gap: 10px; }
+.salon-panel h3 svg { width: 20px; height: 20px; color: var(--amber); }
+.panel-row { padding-block: 18px; border-top: 1px solid var(--night-3); }
+.panel-row dt { font-size: .85rem; color: rgba(255,255,255,.55); margin-bottom: 6px; }
+.panel-row dd { font-size: 1.12rem; line-height: 1.5; }
+.panel-status { display: flex; align-items: flex-start; gap: 12px; }
+.panel-status .icon { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; flex: none; margin-top: 1px; background: var(--night-3); }
+.panel-status.done .icon { background: var(--wa); }
+.panel-status .icon .i-done { display: none; }
+.panel-status.done .icon .i-done { display: block; }
+.panel-status.done .icon .i-wait { display: none; }
+.i-wait { display: flex; gap: 2px; }
+.i-wait i { width: 4px; height: 4px; border-radius: 50%; background: var(--white); animation: blink 1s infinite; }
+.i-wait i:nth-child(2) { animation-delay: .15s; }
+.i-wait i:nth-child(3) { animation-delay: .3s; }
+.chips { display: flex; flex-wrap: wrap; gap: 10px; }
+.chip { display: inline-flex; flex-direction: column; gap: 2px; padding: 10px 14px; border-radius: 12px; background: var(--night-2); box-shadow: inset 0 0 0 1px var(--night-3); font-size: .95rem; animation: pop .3s ease-out both; }
+.chip b { font-weight: 500; font-variant-numeric: tabular-nums; }
+.chip small { font-size: .82rem; color: rgba(255,255,255,.65); }
+.chip.new { background: rgba(0,168,132,.16); box-shadow: inset 0 0 0 1px rgba(0,168,132,.55); }
+.chip.removed b { text-decoration: line-through; text-decoration-color: rgba(255,255,255,.5); color: rgba(255,255,255,.6); }
+.chip.alert { background: rgba(242,179,91,.14); box-shadow: inset 0 0 0 1px rgba(242,179,91,.6); }
+.chip-none { color: rgba(255,255,255,.55); }
+.panel-status .icon svg { width: 15px; height: 15px; }
+.transcript { margin-top: 12px; font-size: .95rem; color: rgba(255,255,255,.7); background: var(--night-2); border-radius: 12px; padding: 12px 14px; }
+.transcript[hidden] { display: none; }
+.transcript small { display: block; font-size: .8rem; color: rgba(255,255,255,.5); margin-bottom: 4px; }
+.panel-foot { margin-top: auto; padding-top: 24px; font-size: .88rem; color: rgba(255,255,255,.5); }
+
+/* Features */
+.features { background: var(--white); }
+.feature-layout { display: grid; grid-template-columns: minmax(0,.85fr) minmax(0,1.15fr); gap: 72px; align-items: start; }
+.feature-layout .section-head { position: sticky; top: 120px; margin-bottom: 0; }
+.feature-list { list-style: none; display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 44px 40px; }
+.feature-list li { display: grid; gap: 10px; align-content: start; }
+.feature-icon { width: 46px; height: 46px; border-radius: 14px; background: var(--paper); display: grid; place-items: center; color: var(--ink); }
+.feature-icon svg { width: 22px; height: 22px; }
+.feature-list h3 { font-weight: 500; font-size: 1.12rem; }
+.feature-list p { color: var(--ink-2); font-size: .98rem; }
+
+/* Languages band */
+.langs { background: var(--night-2); color: var(--white); padding-block: 88px; }
+.langs .wrap { display: grid; grid-template-columns: minmax(0,.8fr) minmax(0,1.2fr); gap: 56px; align-items: center; }
+.langs h2 { font-weight: 600; font-size: clamp(1.7rem, 3vw, 2.3rem); line-height: 1.15; letter-spacing: -0.02em; }
+html[lang="ar"] .langs h2 { letter-spacing: 0; line-height: 1.4; }
+.langs p { margin-top: 14px; color: rgba(255,255,255,.7); font-weight: 300; }
+.lang-bubbles { display: grid; gap: 14px; }
+.lang-bubble { display: grid; grid-template-columns: 100px minmax(0,1fr); gap: 18px; align-items: center; }
+.lang-bubble span { font-size: .85rem; color: rgba(255,255,255,.55); }
+.understood { display: grid; grid-template-columns: 100px minmax(0,1fr); gap: 18px; align-items: center; margin-top: 10px; padding-top: 22px; border-top: 1px dashed var(--night-3); }
+.understood > span { font-size: .85rem; color: var(--amber); }
+.understood div { display: flex; flex-wrap: wrap; gap: 8px; }
+.understood b { font-weight: 400; font-size: .92rem; padding: 7px 12px; border-radius: 999px; box-shadow: inset 0 0 0 1px rgba(242,179,91,.55); }
+.understood b em { font-style: normal; color: rgba(255,255,255,.6); margin-inline-end: 6px; }
+.lang-bubble p { margin: 0; background: var(--bubble); color: #111b21; padding: 12px 16px; border-radius: 14px; font-size: 1rem; font-weight: 400; justify-self: start; }
+
+/* Steps */
+.steps-list { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 0; counter-reset: step; position: relative; }
+.steps-list li { counter-increment: step; position: relative; padding-inline-end: 40px; }
+.steps-list li::before {
+  content: counter(step);
+  display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%;
+  background: var(--ink); color: var(--white); font-weight: 500; font-size: 1.2rem;
+  position: relative; z-index: 1; margin-bottom: 26px;
+}
+.steps-list li:not(:last-child)::after {
+  content: ""; position: absolute; top: 26px; inset-inline-start: 52px; inset-inline-end: 0; height: 2px;
+  background: repeating-linear-gradient(90deg, var(--ink-3) 0 6px, transparent 6px 12px);
+}
+.steps-list h3 { font-weight: 500; font-size: 1.2rem; margin-bottom: 10px; max-width: 22ch; }
+.steps-list p { color: var(--ink-2); max-width: 34ch; }
+
+/* Calculator */
+.calc { background: var(--white); }
+.calc-grid { display: grid; grid-template-columns: minmax(0,1.1fr) minmax(0,.9fr); gap: 32px; align-items: stretch; }
+.calc-inputs { display: grid; gap: 30px; padding: 36px; border-radius: 24px; box-shadow: inset 0 0 0 1px var(--line); }
+.field label { display: flex; justify-content: space-between; gap: 16px; font-size: .98rem; color: var(--ink-2); margin-bottom: 12px; }
+.field output { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; direction: ltr; }
+input[type="range"] {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 28px; background: transparent; cursor: pointer;
+  --fill: 50%;
+}
+input[type="range"]::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: linear-gradient(to right, var(--ink) var(--fill), var(--line) var(--fill)); }
+html[dir="rtl"] input[type="range"]::-webkit-slider-runnable-track { background: linear-gradient(to left, var(--ink) var(--fill), var(--line) var(--fill)); }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%; background: var(--white); border: 6px solid var(--ink); margin-top: -9px; box-shadow: 0 2px 6px rgba(14,23,51,.25); }
+input[type="range"]::-moz-range-track { height: 6px; border-radius: 999px; background: var(--line); }
+input[type="range"]::-moz-range-progress { height: 6px; border-radius: 999px; background: var(--ink); }
+input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--white); border: 6px solid var(--ink); }
+.money { display: flex; align-items: center; gap: 10px; }
+.money input {
+  width: 160px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line);
+  font: inherit; font-size: 1.05rem; color: var(--ink); background: var(--paper); direction: ltr;
+}
+.money span { color: var(--ink-3); }
+.calc-result { background: var(--night); color: var(--white); border-radius: 24px; padding: 40px 36px; display: flex; flex-direction: column; }
+.result-num { font-size: clamp(3.4rem, 7vw, 5.2rem); font-weight: 600; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; color: var(--amber); direction: ltr; text-align: start; }
+html[lang="ar"] .result-num { text-align: right; }
+.result-label { margin-top: 12px; font-size: 1.08rem; color: rgba(255,255,255,.8); }
+.result-money { margin-top: 34px; padding-top: 26px; border-top: 1px solid var(--night-3); }
+.result-money strong { font-size: 2rem; font-weight: 500; font-variant-numeric: tabular-nums; direction: ltr; display: inline-block; }
+.result-money p { color: rgba(255,255,255,.7); margin-top: 4px; }
+.calc-note { margin-top: auto; padding-top: 28px; font-size: .88rem; color: rgba(255,255,255,.5); }
+
+/* Pricing */
+.pricing { background: var(--paper); }
+.offer { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); background: var(--white); border-radius: 28px; overflow: hidden; box-shadow: 0 1px 0 var(--line), 0 30px 60px -40px rgba(14,23,51,.35); }
+.offer-main { padding: 48px; }
+.offer-tag { display: inline-block; background: var(--amber-soft); color: #6e4a12; padding: 6px 14px; border-radius: 999px; font-size: .9rem; font-weight: 500; }
+.offer-price { margin-top: 22px; font-size: clamp(2.6rem, 5vw, 3.6rem); font-weight: 600; letter-spacing: -0.03em; line-height: 1; }
+.offer-price small { font-size: 1.05rem; font-weight: 400; color: var(--ink-3); letter-spacing: 0; margin-inline-start: 8px; }
+.offer-list { list-style: none; margin-top: 30px; display: grid; gap: 14px; }
+.offer-list li { display: flex; gap: 12px; align-items: flex-start; }
+.offer-list svg { width: 22px; height: 22px; color: var(--wa); flex: none; margin-top: 2px; }
+.offer-side { background: var(--night); color: var(--white); padding: 48px; display: flex; flex-direction: column; justify-content: space-between; gap: 32px; }
+.offer-side h3 { font-weight: 500; font-size: 1.3rem; margin-bottom: 12px; }
+.offer-side ul { list-style: none; margin-top: 22px; display: grid; gap: 10px; color: rgba(255,255,255,.75); }
+.offer-side li { display: flex; gap: 10px; align-items: flex-start; }
+.offer-side li svg { width: 20px; height: 20px; color: var(--amber); flex: none; margin-top: 3px; }
+.offer-side p { font-size: 1.15rem; font-weight: 300; color: rgba(255,255,255,.85); max-width: 34ch; }
+.offer-side .btn { align-self: flex-start; }
+
+/* FAQ */
+.faq-grid { display: grid; grid-template-columns: minmax(0,.7fr) minmax(0,1.3fr); gap: 64px; }
+.faq-list { display: grid; }
+.faq-list details { border-top: 1px solid var(--line); }
+.faq-list details:last-child { border-bottom: 1px solid var(--line); }
+.faq-list summary {
+  list-style: none; cursor: pointer; padding: 24px 0; font-size: 1.1rem; font-weight: 500;
+  display: flex; justify-content: space-between; gap: 24px; align-items: center;
+}
+.faq-list summary::-webkit-details-marker { display: none; }
+.faq-list summary::after {
+  content: ""; width: 12px; height: 12px; flex: none; margin-inline-end: 6px;
+  border-right: 2px solid var(--ink); border-bottom: 2px solid var(--ink);
+  transform: rotate(45deg) translate(-3px, -3px); transition: transform .25s;
+}
+.faq-list details[open] summary::after { transform: rotate(-135deg) translate(-3px, -3px); }
+.faq-list details p { padding-bottom: 24px; color: var(--ink-2); max-width: 64ch; }
+
+/* About */
+.faq { background: var(--white); }
+.about { background: var(--paper); }
+.about-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 64px; align-items: start; }
+.about-text { font-size: 1.15rem; color: var(--ink-2); font-weight: 300; max-width: 50ch; margin-top: 18px; }
+.id-card { border-radius: 24px; background: var(--white); box-shadow: inset 0 0 0 1px var(--line); padding: 10px 32px; }
+.id-card dl > div { display: grid; grid-template-columns: 170px minmax(0,1fr); gap: 16px; padding: 18px 0; border-top: 1px solid var(--line); }
+.id-card dl > div:first-child { border-top: 0; }
+.id-card dt { color: var(--ink-3); }
+.id-card dd { font-weight: 500; }
+
+/* CTA band */
+.cta-band { background: var(--night); color: var(--white); padding-block: 110px; position: relative; overflow: hidden; }
+.cta-band::before {
+  content: ""; position: absolute; width: 640px; height: 640px; border-radius: 50%;
+  inset-inline-start: -200px; bottom: -360px;
+  background: radial-gradient(circle, rgba(242,179,91,.2), transparent 65%);
+}
+.cta-band .wrap { position: relative; display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: end; gap: 40px; }
+.cta-band h2 { font-weight: 600; font-size: clamp(2rem, 4vw, 3.2rem); line-height: 1.08; letter-spacing: -0.03em; max-width: 18ch; }
+.cta-band p { margin-top: 16px; font-size: 1.15rem; color: rgba(255,255,255,.75); font-weight: 300; }
+.cta-band .hero-ctas { margin-top: 0; }
+
+/* Contact + privacy */
+.legal { background: var(--paper); padding-block: 96px; }
+.legal-grid { display: grid; grid-template-columns: minmax(0,.7fr) minmax(0,1.3fr); gap: 64px; }
+.legal h2 { font-weight: 600; font-size: 1.6rem; letter-spacing: -0.02em; margin-bottom: 22px; }
+.contact-list { list-style: none; display: grid; gap: 18px; }
+.contact-list small { display: block; color: var(--ink-3); font-size: .88rem; }
+.contact-list a, .contact-list strong { font-weight: 500; font-size: 1.08rem; text-decoration: none; direction: ltr; unicode-bidi: isolate; }
+.contact-list a:hover { text-decoration: underline; }
+.policy { max-width: 70ch; }
+.policy h3 { font-weight: 500; font-size: 1.05rem; margin: 26px 0 6px; }
+.policy p, .policy li { color: var(--ink-2); font-size: .98rem; }
+.policy ul { padding-inline-start: 20px; display: grid; gap: 4px; }
+.policy p + p { margin-top: 10px; }
+.policy .updated { margin-top: 24px; color: var(--ink-3); font-size: .9rem; }
+
+.site-footer { background: var(--paper); border-top: 1px solid var(--line); padding: 30px 0 calc(30px + env(safe-area-inset-bottom, 0px)); font-size: .9rem; color: var(--ink-3); }
+.site-footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.site-footer a { text-decoration: none; }
+.site-footer a:hover { color: var(--ink); }
+
+/* Floating WhatsApp */
+.wa-float {
+  position: fixed; z-index: 40; inset-inline-end: 22px; bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+  width: 58px; height: 58px; border-radius: 50%; background: var(--wa); color: var(--white);
+  display: grid; place-items: center; box-shadow: 0 14px 30px -10px rgba(0,0,0,.45);
+  opacity: 0; transform: translateY(16px); pointer-events: none; transition: opacity .3s, transform .3s;
+}
+.wa-float.show { opacity: 1; transform: none; pointer-events: auto; }
+.wa-float svg { width: 28px; height: 28px; }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1060px) {
+  .main-nav { display: none; }
+  .hero .wrap { grid-template-columns: minmax(0,1fr); grid-template-areas: "title" "chat" "copy"; grid-template-rows: none; }
+  .hero-title { padding-top: 0; margin-bottom: 18px; }
+  .hero-chat { max-width: 520px; }
+  .hero-copy { margin-top: 40px; }
+  .hero-copy .hero-lede { margin-top: 0; }
+  .cta-band .wrap { grid-template-columns: 1fr; }
+  .demo-grid { grid-template-columns: 1fr; }
+  .demo .phone { margin-inline: auto; }
+  .feature-layout { grid-template-columns: 1fr; gap: 48px; }
+  .feature-layout .section-head { position: static; }
+  .langs .wrap, .calc-grid, .offer, .faq-grid, .about-grid, .legal-grid { grid-template-columns: 1fr; }
+  .faq-grid, .about-grid, .legal-grid { gap: 36px; }
+}
+@media (max-width: 760px) {
+  body { font-size: 16px; }
+  .section { padding-block: 80px; }
+  .hero { padding-top: calc(72px + 16px + env(safe-area-inset-top, 0px)); padding-bottom: 72px; }
+  .hero h1 { font-size: 1.55rem; line-height: 1.15; letter-spacing: -0.02em; max-width: none; }
+  .eyebrow { font-size: .78rem; margin-bottom: 12px; }
+  .lang-select { padding: 6px 8px; font-size: .85rem; }
+  html[lang="ar"] .hero h1 { font-size: 1.45rem; line-height: 1.45; max-width: none; }
+  .hero-title { margin-bottom: 14px; }
+  .chat-intro { font-size: .9rem; margin-bottom: 10px; }
+  .header-actions .btn { display: none; }
+  .pain-grid, .feature-list { grid-template-columns: 1fr; gap: 32px; }
+  .tabs { flex-wrap: nowrap; overflow-x: auto; margin-inline: -24px; padding-inline: 24px; padding-bottom: 6px; scroll-snap-type: x mandatory; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { flex: none; scroll-snap-align: start; }
+  .steps-list { grid-template-columns: 1fr; gap: 36px; }
+  .steps-list li { padding-inline-end: 0; }
+  .steps-list li:not(:last-child)::after { display: none; }
+  .understood { grid-template-columns: 1fr; gap: 10px; }
+  .offer-main, .offer-side { padding: 32px 26px; }
+  .calc-inputs, .calc-result { padding: 28px 24px; }
+  .salon-panel { padding: 28px 24px; }
+  .id-card { padding: 6px 22px; }
+  .id-card dl > div { grid-template-columns: 1fr; gap: 2px; }
+  .lang-bubble { grid-template-columns: 1fr; gap: 6px; }
+  .cta-band { padding-block: 84px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}
+</style>
+</head>
+<body>
+
+<header class="site-header" id="top">
+  <div class="wrap">
+    <a class="logo" href="#top" aria-label="Lumière Hair &amp; Beauty Studio - AI receptionist demo">
+      <svg class="logo-mark" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="18" fill="currentColor" opacity=".12"/><path d="M32 12c2.6 9.4 6.6 13.4 16 16-9.4 2.6-13.4 6.6-16 16-2.6-9.4-6.6-13.4-16-16 9.4-2.6 13.4-6.6 16-16Z" fill="#e2b86b"/><circle cx="46" cy="46" r="4" fill="currentColor" opacity=".7"/></svg>
+      <span class="logo-text">Lumière<small data-i18n="brand.sub">Hair &amp; Beauty Studio</small></span>
+    </a>
+    <nav class="main-nav" aria-label="Main navigation" data-i18n-aria="nav.aria">
+      <a href="#demo" data-i18n="nav.demo">Demo</a>
+      <a href="#features" data-i18n="nav.how">Features</a>
+      <a href="#pricing" data-i18n="nav.pricing">Pricing</a>
+      <a href="#faq" data-i18n="nav.faq">FAQ</a>
+    </nav>
+    <div class="header-actions">
+      <label class="sr-only" for="langSelect" data-i18n="nav.lang">Website language</label>
+      <select class="lang-select" id="langSelect">
+        <option value="en" lang="en">English</option>
+        <option value="fr" lang="fr">Français</option>
+        <option value="es" lang="es">Español</option>
+        <option value="ar" lang="ar">العربية</option>
+      </select>
+      <a class="btn btn-amber js-wa" href="https://wa.me/213777744607" target="_blank" rel="noopener" data-i18n="nav.cta">Free trial</a>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<!-- ============ HERO ============ -->
+<section class="hero" aria-labelledby="hero-title">
+  <div class="wrap">
+    <div class="hero-title">
+      <p class="eyebrow" data-i18n="hero.eyebrow">Live demo · Lumière Hair &amp; Beauty Studio</p>
+      <h1 id="hero-title" data-i18n="hero.title">Your salon's AI receptionist, answering clients day and night.</h1>
+    </div>
+
+    <div class="hero-chat">
+      <p class="chat-intro" data-i18n="chat.intro">Try it now: you are chatting with Yasmine, the receptionist of Lumière Hair &amp; Beauty Studio, a fictional demo salon.</p>
+      <div class="live-chat" id="liveChat" role="region" aria-label="Demo conversation with Yasmine" aria-describedby="chatDisclaimer" lang="en" dir="ltr">
+        <div class="wa-bar lc-bar">
+          <div class="wa-avatar" aria-hidden="true">L</div>
+          <div>
+            <strong>Lumière · Yasmine <span class="lc-badge" id="chatBadge">Demo</span></strong>
+            <span class="lc-status"><i aria-hidden="true"></i><span id="chatStatus">online</span></span>
+          </div>
+        </div>
+        <fieldset class="lc-langs">
+          <legend class="sr-only" id="chatLegend">Conversation language</legend>
+          <label><input type="radio" name="chatLang" value="en" checked><span lang="en">English</span></label>
+          <label><input type="radio" name="chatLang" value="fr"><span lang="fr">Français</span></label>
+          <label><input type="radio" name="chatLang" value="es"><span lang="es">Español</span></label>
+          <label><input type="radio" name="chatLang" value="ar"><span lang="ar">العربية</span></label>
+        </fieldset>
+        <div class="lc-log" id="chatLog" role="log" aria-live="polite" aria-label="Conversation with Yasmine" tabindex="0"></div>
+        <div class="lc-replies" id="chatReplies" role="group" aria-label="Suggested messages"></div>
+        <form class="lc-form" id="chatForm" autocomplete="off" novalidate>
+          <div class="lc-hp" aria-hidden="true"><label>Website <input type="text" name="website" id="chatHp" tabindex="-1" autocomplete="off"></label></div>
+          <label class="sr-only" for="chatInput" id="chatInputLabel">Your message</label>
+          <input type="text" id="chatInput" maxlength="500" enterkeyhint="send" placeholder="Type a message…">
+          <button class="lc-send" id="chatSend" type="submit" aria-label="Send">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3.4 20.4 21 12 3.4 3.6 3.4 10l12.6 2-12.6 2z"/></svg>
+          </button>
+        </form>
+      </div>
+      <p class="chat-disclaimer" id="chatDisclaimer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        <span data-i18n="chat.disclaimer">Demo with a fictional salon: prices, address and opening hours are demo values. Please use a fake name and don't share personal details.</span>
+      </p>
+      <a class="hero-more" href="#why">
+        <span data-i18n="hero.more">Learn more</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      </a>
+    </div>
+
+    <div class="hero-copy">
+      <p class="hero-lede" data-i18n="hero.lede">Yasmine answers your clients on WhatsApp, Messenger and your website, at any hour. She explains your services and prices, finds a free time in your Google Calendar, and books, moves and cancels appointments, in English, French, Spanish and Arabic.</p>
+      <div class="hero-ctas">
+        <a class="btn btn-amber js-wa" href="https://wa.me/213777744607" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.5.1-.7.3-.2.3-.9.9-.9 2.2s.9 2.5 1 2.7c.1.2 1.8 2.8 4.4 3.9 1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.2-.2-.2-.5-.4Z"/></svg>
+          <span data-i18n="hero.cta1">Get Yasmine for your salon</span>
+        </a>
+        <a class="btn btn-ghost" href="#demo" data-i18n="hero.cta2">See examples</a>
+      </div>
+      <p class="hero-note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+        <span data-i18n="hero.note">2-week free trial, no commitment, set up with your own services, prices and opening hours.</span>
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PAIN ============ -->
+<section class="section pain" id="why" aria-labelledby="pain-title">
+  <div class="wrap">
+    <div class="section-head">
+      <h2 id="pain-title" data-i18n="pain.title">Every unanswered message is a client booking at another salon.</h2>
+    </div>
+    <div class="pain-grid">
+      <div class="pain-item">
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg><span data-i18n="pain.1t">After closing time</span></h3>
+        <p data-i18n="pain.1d">Clients decide on a new look in the evening and on Sundays. By the next morning, some of them have already booked somewhere else.</p>
+      </div>
+      <div class="pain-item">
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12"/></svg><span data-i18n="pain.2t">Hands busy with clients</span></h3>
+        <p data-i18n="pain.2d">Your team is cutting, colouring and doing nails. Nobody can answer the phone or WhatsApp in the middle of a balayage.</p>
+      </div>
+      <div class="pain-item">
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2.1 21 6l-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg><span data-i18n="pain.3t">The same questions every day</span></h3>
+        <p data-i18n="pain.3d">"How much is a balayage?", "Are you open on Saturday?", "Do you have time tomorrow?" Most messages ask the same things.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DEMO ============ -->
+<section class="section demo" id="demo" aria-labelledby="demo-title">
+  <div class="wrap">
+    <div class="section-head">
+      <h2 id="demo-title" data-i18n="demo.title">See Yasmine handle real salon requests</h2>
+      <p class="section-lede" data-i18n="demo.lede">Pick a situation. Next to the phone, you see what happens on the salon's side.</p>
+    </div>
+
+    <div class="tabs" role="tablist" aria-label="Situations" data-i18n-aria="demo.tabs">
+      <button class="tab" role="tab" aria-selected="true" aria-controls="demoPanel" data-scenario="booking" data-i18n="tab.booking">Book a haircut</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="demoPanel" data-scenario="reschedule" data-i18n="tab.reschedule">Reschedule</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="demoPanel" data-scenario="cancel" data-i18n="tab.cancel">Cancel</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="demoPanel" data-scenario="voice" data-i18n="tab.voice">Voice message</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="demoPanel" data-scenario="info" data-i18n="tab.info">Prices &amp; hours</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="demoPanel" data-scenario="urgent" data-i18n="tab.urgent">Reaction after a colour</button>
+    </div>
+
+    <div class="demo-grid" id="demoPanel" role="tabpanel">
+      <div class="phone">
+        <div class="phone-screen">
+          <div class="wa-bar">
+            <div class="wa-avatar" aria-hidden="true">L</div>
+            <div><strong data-i18n="hero.salon">Lumière Hair &amp; Beauty</strong><span data-i18n="hero.status">Yasmine is replying</span></div>
+          </div>
+          <div class="chat" id="demoChat"></div>
+          <div class="wa-input" aria-hidden="true"><div></div><span></span></div>
+        </div>
+      </div>
+
+      <div class="salon-panel" aria-live="polite">
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><span data-i18n="panel.title">At the salon</span></h3>
+        <dl>
+          <div class="panel-row"><dt data-i18n="panel.lang">Client's language</dt><dd id="panelLang">English</dd></div>
+          <div class="panel-row"><dt data-i18n="panel.agenda">Calendar and team</dt><dd id="panelChips"><span class="chip-none">–</span></dd></div>
+          <div class="panel-row">
+            <dt data-i18n="panel.action">What was done</dt>
+            <dd>
+              <div class="panel-status" id="panelStatus">
+                <span class="icon" aria-hidden="true"><span class="i-wait"><i></i><i></i><i></i></span><svg class="i-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+                <span id="panelLog">Yasmine is replying to the client…</span>
+              </div>
+              <div class="transcript" id="panelTranscript" hidden></div>
+            </dd>
+          </div>
+        </dl>
+        <p class="panel-foot" data-i18n="panel.foot">Demo examples with the fictional Lumière salon and its demo price list. Before going live, you approve Yasmine's answers with your own salon information.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FEATURES ============ -->
+<section class="section features" id="features" aria-labelledby="feat-title">
+  <div class="wrap feature-layout">
+    <div class="section-head">
+      <h2 id="feat-title" data-i18n="feat.title">What Yasmine takes care of, day and night.</h2>
+      <p class="section-lede" data-i18n="feat.lede">She handles the repetitive messages, so your team can focus on the clients in the chair.</p>
+    </div>
+    <ul class="feature-list">
+      <li>
+        <span class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4"/></svg></span>
+        <h3 data-i18n="feat.1t">Bookings that fit the service</h3>
+        <p data-i18n="feat.1d">She only offers times that are really free for the whole service, from a 30-minute cut to a 3-hour balayage, and writes the appointment in your Google Calendar.</p>
+      </li>
+      <li>
+        <span class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg></span>
+        <h3 data-i18n="feat.2t">Changes and cancellations</h3>
+        <p data-i18n="feat.2d">Clients move or cancel by message. The freed time is immediately available for someone else.</p>
+      </li>
+      <li>
+        <span class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg></span>
+        <h3 data-i18n="feat.3t">Your services, prices and policies</h3>
+        <p data-i18n="feat.3d">Cuts, colour, balayage, treatments, nails, facials: she answers with your own price list, durations, opening hours and policies, never with made-up numbers.</p>
+      </li>
+      <li>
+        <span class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/></svg></span>
+        <h3 data-i18n="feat.4t">Voice messages</h3>
+        <p data-i18n="feat.4d">Many clients prefer to talk. On WhatsApp and Messenger, Yasmine transcribes voice notes in your salon's main language and replies in writing.</p>
+      </li>
+      <li>
+        <span class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 8 6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6"/></svg></span>
+        <h3 data-i18n="feat.5t">English, French, Spanish, Arabic</h3>
+        <p data-i18n="feat.5d">She detects the client's language from each message, casual spelling included, and replies naturally in that language.</p>
+      </li>
+      <li>
+        <span class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg></span>
+        <h3 data-i18n="feat.6t">Hands over to your team</h3>
+        <p data-i18n="feat.6d">A complaint, a reaction after a treatment, a special request: she alerts your team on WhatsApp instead of improvising.</p>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ LANGUAGES ============ -->
+<section class="langs" aria-labelledby="langs-title">
+  <div class="wrap">
+    <div>
+      <h2 id="langs-title" data-i18n="langs.title">One request, written four ways.</h2>
+      <p data-i18n="langs.text">Yasmine understands all four and answers each client in their own language.</p>
+    </div>
+    <div class="lang-bubbles">
+      <div class="lang-bubble"><span data-i18n="langs.en">English</span><p dir="ltr" lang="en">Hi! I'd like to book a haircut for tomorrow.</p></div>
+      <div class="lang-bubble"><span data-i18n="langs.es">Spanish</span><p dir="ltr" lang="es">Hola, ¿tenéis disponibilidad para un corte de pelo mañana?</p></div>
+      <div class="lang-bubble"><span data-i18n="langs.fr">French</span><p dir="ltr" lang="fr">Bonjour, je voudrais un rendez-vous demain pour une coupe.</p></div>
+      <div class="lang-bubble"><span data-i18n="langs.ar">Arabic</span><p dir="rtl" lang="ar">مرحباً، أريد حجز موعد لقص الشعر غداً.</p></div>
+      <div class="understood">
+        <span data-i18n="langs.understood">Understood</span>
+        <div>
+          <b><em data-i18n="langs.k1">Request</em><span data-i18n="langs.v1">appointment</span></b>
+          <b><em data-i18n="langs.k2">Service</em><span data-i18n="langs.v2">haircut</span></b>
+          <b><em data-i18n="langs.k3">Day</em><span data-i18n="langs.v3">tomorrow</span></b>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ STEPS ============ -->
+<section class="section" aria-labelledby="steps-title">
+  <div class="wrap">
+    <div class="section-head">
+      <h2 id="steps-title" data-i18n="steps.title">How the setup works</h2>
+    </div>
+    <ol class="steps-list">
+      <li>
+        <h3 data-i18n="steps.1t">We set Yasmine up for your salon</h3>
+        <p data-i18n="steps.1d">Your services, prices, durations, opening hours and booking rules. You approve her answers before she goes live.</p>
+      </li>
+      <li>
+        <h3 data-i18n="steps.2t">You try her for 2 weeks with real clients</h3>
+        <p data-i18n="steps.2d">Free and without commitment. Your calendar stays under your control at all times.</p>
+      </li>
+      <li>
+        <h3 data-i18n="steps.3t">We decide together what comes next</h3>
+        <p data-i18n="steps.3d">If she saves your salon time, we agree on a monthly subscription that fits your volume.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============ CALCULATOR ============ -->
+<section class="section calc" aria-labelledby="calc-title">
+  <div class="wrap">
+    <div class="section-head">
+      <h2 id="calc-title" data-i18n="calc.title">How many bookings slip away every month?</h2>
+      <p class="section-lede" data-i18n="calc.lede">Enter your own numbers. The calculation runs in your browser; nothing is sent.</p>
+    </div>
+    <div class="calc-grid">
+      <div class="calc-inputs">
+        <div class="field">
+          <label for="cMsgs"><span data-i18n="calc.l1">Messages received outside opening hours or while busy, per week</span><output id="oMsgs" for="cMsgs">30</output></label>
+          <input type="range" id="cMsgs" min="5" max="200" step="5" value="30">
+        </div>
+        <div class="field">
+          <label for="cBook"><span data-i18n="calc.l2">Share of these messages that are booking requests</span><output id="oBook" for="cBook">50 %</output></label>
+          <input type="range" id="cBook" min="10" max="90" step="5" value="50">
+        </div>
+        <div class="field">
+          <label for="cLost"><span data-i18n="calc.l3">Share of clients who don't write again</span><output id="oLost" for="cLost">25 %</output></label>
+          <input type="range" id="cLost" min="5" max="70" step="5" value="25">
+        </div>
+        <div class="field">
+          <label for="cPrice"><span data-i18n="calc.l4">Average price of a salon visit</span></label>
+          <div class="money"><input type="number" id="cPrice" min="0" step="5" value="45" inputmode="numeric"><span id="cCurrency">€</span></div>
+        </div>
+      </div>
+      <div class="calc-result" aria-live="polite">
+        <div class="result-num" id="rCount">16</div>
+        <p class="result-label" data-i18n="calc.r1">bookings potentially lost every month</p>
+        <div class="result-money">
+          <strong id="rMoney">720 €</strong>
+          <p data-i18n="calc.r2">of appointments that never happen, per month</p>
+        </div>
+        <p class="calc-note" data-i18n="calc.note">Rough estimate, calculated only from the numbers you enter.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PRICING ============ -->
+<section class="section pricing" id="pricing" aria-labelledby="price-title">
+  <div class="wrap">
+    <div class="section-head">
+      <h2 id="price-title" data-i18n="price.title">Start with two free weeks</h2>
+      <p class="section-lede" data-i18n="price.lede">You see Yasmine working with your real clients before you decide anything.</p>
+    </div>
+    <div class="offer">
+      <div class="offer-main">
+        <span class="offer-tag" data-i18n="price.tag">Free trial</span>
+        <div class="offer-price"><span data-i18n="price.free">Free</span><small data-i18n="price.dur">for 2 weeks</small></div>
+        <ul class="offer-list">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span data-i18n="price.i1">Yasmine set up with your salon's services, prices and hours</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span data-i18n="price.i2">Connected to your Google Calendar</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span data-i18n="price.i3">Conversations followed throughout the trial</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span data-i18n="price.i4">No commitment, no payment</span></li>
+        </ul>
+      </div>
+      <div class="offer-side">
+        <div>
+          <h3 data-i18n="price.afterTitle">And after the trial?</h3>
+          <p data-i18n="price.after">A monthly subscription based on your salon's message volume, agreed together. You can stop whenever you want.</p>
+          <ul>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 22h8M12 18v4"/></svg><span data-i18n="price.s1">Nothing to install on the salon's computers</span></li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span data-i18n="price.s2">One direct contact person for your salon</span></li>
+          </ul>
+        </div>
+        <a class="btn btn-amber js-wa" href="https://wa.me/213777744607" target="_blank" rel="noopener" data-i18n="price.cta">Request my free trial</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FAQ ============ -->
+<section class="section faq" id="faq" aria-labelledby="faq-title">
+  <div class="wrap faq-grid">
+    <div class="section-head">
+      <h2 id="faq-title" data-i18n="faq.title">Frequently asked questions</h2>
+    </div>
+    <div class="faq-list">
+      <details><summary data-i18n="faq.q1">Does Yasmine replace my receptionist?</summary><p data-i18n="faq.a1">No. She takes care of repetitive messages and requests outside opening hours. Your team keeps the cases that need a person, and Yasmine hands them over.</p></details>
+      <details><summary data-i18n="faq.q2">Can clients choose a specific stylist?</summary><p data-i18n="faq.a2">Today Yasmine books into one shared salon calendar: each time slot holds one appointment. She can note a stylist preference in the booking for your team, but she does not manage separate schedules per stylist.</p></details>
+      <details><summary data-i18n="faq.q3">What if a client asks about an allergy or a reaction?</summary><p data-i18n="faq.a3">Yasmine never gives medical or skin-care advice. She tells the client to seek medical help if it is urgent and alerts your team so a person can follow up.</p></details>
+      <details><summary data-i18n="faq.q4">I already use booking software.</summary><p data-i18n="faq.a4">Yasmine works with Google Calendar today. If your salon uses other software, we look together at the best setup before the trial.</p></details>
+      <details><summary data-i18n="faq.q5">What happens to my clients' data?</summary><p data-i18n="faq.a5">It is only used to reply to clients and manage their appointments. It is never sold or used for advertising. Details are in the privacy policy at the bottom of the page.</p></details>
+      <details><summary data-i18n="faq.q6">How much does it cost?</summary><p data-i18n="faq.a6">The 2-week trial is free. After that, the monthly subscription depends on your salon's message volume, and we agree on it together after the trial.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ABOUT ============ -->
+<section class="section about" id="about" aria-labelledby="about-title">
+  <div class="wrap about-grid">
+    <div>
+      <h2 id="about-title" data-i18n="about.title">Who is behind Yasmine</h2>
+      <p class="about-text" data-i18n="about.text">Yasmine is designed, built and maintained by Hamza Mihoubi, a developer specialised in conversational assistants. Lumière Hair &amp; Beauty Studio is a fictional salon created for this demo. Every salon that uses Yasmine is supported directly by the person who built the tool.</p>
+    </div>
+    <div class="id-card">
+      <dl>
+        <div><dt data-i18n="id.name">Business name</dt><dd>Hamza Mihoubi</dd></div>
+        <div><dt data-i18n="id.status">Status</dt><dd data-i18n="id.statusv">Self-employed (ANAE)</dd></div>
+        <div><dt data-i18n="id.activity">Activity</dt><dd data-i18n="id.activityv">Chatbot developer</dd></div>
+        <div><dt data-i18n="id.city">City</dt><dd data-i18n="id.cityv">Bougara, Blida, Algeria</dd></div>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CTA BAND ============ -->
+<section class="cta-band" aria-labelledby="cta-title">
+  <div class="wrap">
+    <div>
+      <h2 id="cta-title" data-i18n="final.title">Tonight, clients will message your salon.</h2>
+      <p data-i18n="final.text">Make sure someone answers them.</p>
+    </div>
+    <div class="hero-ctas">
+      <a class="btn btn-amber js-wa" href="https://wa.me/213777744607" target="_blank" rel="noopener" data-i18n="final.cta">Start the free trial</a>
+      <a class="btn btn-ghost" href="#demo" data-i18n="hero.cta2">See examples</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CONTACT + PRIVACY ============ -->
+<section class="legal" aria-label="Contact and privacy" data-i18n-aria="legal.aria">
+  <div class="wrap legal-grid">
+    <div id="contact">
+      <h2 data-i18n="contact.title">Contact</h2>
+      <ul class="contact-list">
+        <li><small data-i18n="contact.phone">Phone and WhatsApp</small><a href="tel:+213777744607">+213 777 74 46 07</a></li>
+        <li><small data-i18n="contact.email">E-mail</small><a href="mailto:mihoubihamzza@gmail.com">mihoubihamzza@gmail.com</a></li>
+        <li><small data-i18n="contact.address">Address</small><strong data-i18n="id.cityv">Bougara, Blida, Algeria</strong></li>
+      </ul>
+    </div>
+    <div class="policy" id="privacy">
+      <h2 data-i18n="privacy.title">Privacy policy</h2>
+      <p data-i18n="privacy.intro">This policy explains how Hamza Mihoubi, self-employed, processes personal data when clients chat with Yasmine on WhatsApp, Messenger or a website on behalf of a salon.</p>
+      <h3 data-i18n="privacy.h1">Data processed</h3>
+      <ul>
+        <li data-i18n="privacy.l1">The client's WhatsApp number or Messenger ID, and their name.</li>
+        <li data-i18n="privacy.l2">The content of the messages and voice messages sent to the assistant.</li>
+        <li data-i18n="privacy.l3">Appointment details: date, time and the service requested.</li>
+      </ul>
+      <h3 data-i18n="privacy.h2">Use</h3>
+      <p data-i18n="privacy.p2">This data is only used to reply to the client, manage their appointments with the salon concerned and hand the conversation over to the salon team when needed. It is never sold or used for advertising.</p>
+      <h3 data-i18n="privacy.h3">Technical providers</h3>
+      <p data-i18n="privacy.p3">The service relies on providers to work: WhatsApp and Messenger (Meta) for messages, Google for the calendar and the conversation log, and artificial intelligence services to understand written and voice messages. Data is shared with them only for this purpose.</p>
+      <p data-i18n="privacy.p3b">Demo chat on this website: messages typed in the demo chat at the top of this page are sent to Hamza Mihoubi's server, then to the artificial intelligence service that generates Yasmine's replies. They are only used to produce these replies. Please do not enter personal information.</p>
+      <h3 data-i18n="privacy.h4">Retention</h3>
+      <p data-i18n="privacy.p4">Data is kept as long as needed to manage appointments and the relationship between the client and the salon, then deleted. Demo bookings made on this website are deleted automatically after 24 hours.</p>
+      <h3 data-i18n="privacy.h5">Your rights</h3>
+      <p data-i18n="privacy.p5">You can ask to access, correct or delete your data by writing to the e-mail address in the Contact section.</p>
+      <p class="updated" data-i18n="privacy.updated">Last updated: November 2026.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <span data-i18n="footer.legal">© 2026 Hamza Mihoubi, self-employed (ANAE), chatbot developer. Bougara, Blida, Algeria. Lumière Hair &amp; Beauty Studio is a fictional demo salon.</span>
+    <a href="#privacy" data-i18n="privacy.title">Privacy policy</a>
+  </div>
+</footer>
+
+<a class="wa-float js-wa" id="waFloat" href="https://wa.me/213777744607" target="_blank" rel="noopener" aria-label="Message us on WhatsApp" data-i18n-aria="wa.aria">
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.5.1-.7.3-.2.3-.9.9-.9 2.2s.9 2.5 1 2.7c.1.2 1.8 2.8 4.4 3.9 1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.2-.2-.2-.5-.4Z"/></svg>
+</a>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- Demo chat config (n8n) ---------- */
+  const CHAT_WEBHOOK_URL = "https://hundredth-silliness-crispy.ngrok-free.dev/webhook/lumiere-website-demo";    // n8n webhook (POST JSON). Empty = the demo shows its "resting" message.
+  const CHAT_TIMEOUT_MS = 45000;  // no reply within this delay = "resting" message (a booking can take 10-30 s)
+  const CHAT_MAX_MESSAGES = 20;   // per visitor session
+  const CHAT_MAX_CHARS = 500;
+  const ENABLE_VOICE = false;     // phase 2 (microphone input), not built yet: keep false
+  const CURRENCY = "€";           // calculator currency
+  const LANGS = ["en", "fr", "es", "ar"];
+
+  /* ---------- Translations (English lives in the HTML) ---------- */
+  var I18N = {
+    fr: {
+      "brand.sub": "Hair & Beauty Studio",
+      "nav.aria": "Navigation principale",
+      "nav.demo": "Démonstration",
+      "nav.how": "Fonctionnalités",
+      "nav.pricing": "Tarif",
+      "nav.faq": "Questions",
+      "nav.lang": "Langue du site",
+      "nav.cta": "Essai gratuit",
+      "hero.eyebrow": "Démo en direct · Lumière Hair & Beauty Studio",
+      "hero.title": "La réceptionniste IA de votre salon, qui répond à vos clients jour et nuit.",
+      "chat.intro": "Essayez maintenant : vous parlez avec Yasmine, la réceptionniste de Lumière Hair & Beauty Studio, un salon fictif de démonstration.",
+      "chat.disclaimer": "Démo avec un salon fictif : les prix, l'adresse et les horaires sont des valeurs de démonstration. Utilisez un faux nom et n'écrivez pas d'informations personnelles.",
+      "hero.more": "En savoir plus",
+      "hero.lede": "Yasmine répond à vos clients sur WhatsApp, Messenger et votre site, à toute heure. Elle présente vos prestations et vos tarifs, trouve un créneau libre dans votre Google Agenda, et prend, déplace et annule les rendez-vous, en anglais, français, espagnol et arabe.",
+      "hero.cta1": "Yasmine pour mon salon",
+      "hero.cta2": "Voir des exemples",
+      "hero.note": "2 semaines d'essai gratuit, sans engagement, configurée avec vos prestations, vos tarifs et vos horaires.",
+      "pain.title": "Chaque message sans réponse, c'est une cliente qui réserve dans un autre salon.",
+      "pain.1t": "Après la fermeture",
+      "pain.1d": "On décide d'un nouveau look le soir et le dimanche. Le lendemain matin, une partie des clients a déjà réservé ailleurs.",
+      "pain.2t": "Les mains occupées",
+      "pain.2d": "Votre équipe coupe, colore et pose des ongles. Personne ne peut répondre au téléphone ou à WhatsApp en plein balayage.",
+      "pain.3t": "Toujours les mêmes questions",
+      "pain.3d": "« Combien coûte un balayage ? », « Vous êtes ouverts samedi ? », « Vous avez de la place demain ? » La plupart des messages demandent la même chose.",
+      "demo.title": "Voyez Yasmine gérer de vraies demandes de salon",
+      "demo.lede": "Choisissez une situation. À côté du téléphone, ce qui se passe du côté du salon.",
+      "demo.tabs": "Situations",
+      "tab.booking": "Réserver une coupe",
+      "tab.reschedule": "Déplacer",
+      "tab.cancel": "Annuler",
+      "tab.voice": "Message vocal",
+      "tab.info": "Tarifs et horaires",
+      "tab.urgent": "Réaction après une couleur",
+      "hero.salon": "Lumière Hair & Beauty",
+      "hero.status": "Yasmine répond",
+      "panel.title": "Côté salon",
+      "panel.lang": "Langue du client",
+      "panel.agenda": "Agenda et équipe",
+      "panel.action": "Ce qui a été fait",
+      "panel.none": "Aucun changement",
+      "panel.waiting": "Yasmine répond au client…",
+      "panel.foot": "Exemples de démonstration avec le salon fictif Lumière et sa grille tarifaire de démo. Avant la mise en service, vous validez les réponses de Yasmine avec les informations de votre salon.",
+      "feat.title": "Ce que Yasmine prend en charge, jour et nuit.",
+      "feat.lede": "Elle s'occupe des messages répétitifs, pour que votre équipe se concentre sur les clients au fauteuil.",
+      "feat.1t": "Des rendez-vous adaptés à la prestation",
+      "feat.1d": "Elle ne propose que les créneaux vraiment libres pour toute la durée de la prestation, d'une coupe de 30 minutes à un balayage de 3 heures, et inscrit le rendez-vous dans votre Google Agenda.",
+      "feat.2t": "Changements et annulations",
+      "feat.2d": "Les clients déplacent ou annulent par message. Le créneau libéré redevient tout de suite disponible.",
+      "feat.3t": "Vos prestations, tarifs et règles",
+      "feat.3d": "Coupe, couleur, balayage, soins, ongles, soins du visage : elle répond avec votre grille tarifaire, vos durées, vos horaires et vos règles, jamais avec des chiffres inventés.",
+      "feat.4t": "Messages vocaux",
+      "feat.4d": "Beaucoup de clients préfèrent parler. Sur WhatsApp et Messenger, Yasmine transcrit les vocaux dans la langue principale de votre salon et répond par écrit.",
+      "feat.5t": "Anglais, français, espagnol, arabe",
+      "feat.5d": "Elle détecte la langue du client à chaque message, même écrit à la va-vite, et répond naturellement dans cette langue.",
+      "feat.6t": "Relais à votre équipe",
+      "feat.6d": "Une réclamation, une réaction après un soin, une demande particulière : elle prévient votre équipe sur WhatsApp au lieu d'improviser.",
+      "langs.title": "Une même demande, écrite de quatre façons.",
+      "langs.text": "Yasmine comprend les quatre et répond à chaque client dans sa langue.",
+      "langs.en": "Anglais",
+      "langs.es": "Espagnol",
+      "langs.fr": "Français",
+      "langs.ar": "Arabe",
+      "langs.understood": "Compris",
+      "langs.k1": "Demande",
+      "langs.v1": "rendez-vous",
+      "langs.k2": "Prestation",
+      "langs.v2": "coupe",
+      "langs.k3": "Jour",
+      "langs.v3": "demain",
+      "steps.title": "Comment se passe la mise en place",
+      "steps.1t": "On configure Yasmine pour votre salon",
+      "steps.1d": "Vos prestations, tarifs, durées, horaires et règles de réservation. Vous validez ses réponses avant la mise en service.",
+      "steps.2t": "Vous l'essayez 2 semaines avec vos vrais clients",
+      "steps.2d": "Gratuitement et sans engagement. Votre agenda reste sous votre contrôle à tout moment.",
+      "steps.3t": "On décide ensemble de la suite",
+      "steps.3d": "Si elle fait gagner du temps à votre salon, on fixe un abonnement mensuel adapté à votre volume.",
+      "calc.title": "Combien de rendez-vous vous échappent chaque mois ?",
+      "calc.lede": "Entrez vos propres chiffres. Le calcul se fait dans votre navigateur, rien n'est envoyé.",
+      "calc.l1": "Messages reçus hors horaires ou pendant le travail, par semaine",
+      "calc.l2": "Part de ces messages qui sont des demandes de rendez-vous",
+      "calc.l3": "Part des clients qui ne réécrivent pas",
+      "calc.l4": "Prix moyen d'une visite au salon",
+      "calc.r1": "rendez-vous potentiellement perdus chaque mois",
+      "calc.r2": "de prestations non réalisées par mois",
+      "calc.note": "Estimation indicative, calculée uniquement à partir des chiffres que vous saisissez.",
+      "price.title": "Commencez par deux semaines gratuites",
+      "price.lede": "Vous voyez Yasmine travailler avec vos vrais clients avant de prendre la moindre décision.",
+      "price.tag": "Essai gratuit",
+      "price.free": "Gratuit",
+      "price.dur": "pendant 2 semaines",
+      "price.i1": "Yasmine configurée avec les prestations, tarifs et horaires de votre salon",
+      "price.i2": "Connexion à votre Google Agenda",
+      "price.i3": "Suivi des conversations pendant tout l'essai",
+      "price.i4": "Sans engagement et sans paiement",
+      "price.afterTitle": "Et après l'essai ?",
+      "price.after": "Un abonnement mensuel selon le volume de messages de votre salon, fixé ensemble. Vous arrêtez quand vous voulez.",
+      "price.s1": "Rien à installer sur les ordinateurs du salon",
+      "price.s2": "Un interlocuteur direct pour votre salon",
+      "price.cta": "Demander mon essai gratuit",
+      "faq.title": "Questions fréquentes",
+      "faq.q1": "Est-ce que Yasmine remplace ma réceptionniste ?",
+      "faq.a1": "Non. Elle prend en charge les messages répétitifs et les demandes hors horaires. Votre équipe garde les cas qui demandent une personne, et Yasmine les lui transmet.",
+      "faq.q2": "Les clients peuvent-ils choisir une coiffeuse précise ?",
+      "faq.a2": "Aujourd'hui, Yasmine réserve dans un agenda commun au salon : chaque créneau accueille un rendez-vous. Elle peut noter une préférence de coiffeuse pour votre équipe, mais elle ne gère pas un planning séparé par personne.",
+      "faq.q3": "Et si une cliente parle d'une allergie ou d'une réaction ?",
+      "faq.a3": "Yasmine ne donne jamais d'avis médical ou dermatologique. Elle conseille de consulter en cas d'urgence et prévient votre équipe pour qu'une personne prenne le relais.",
+      "faq.q4": "J'utilise déjà un logiciel de réservation.",
+      "faq.a4": "Yasmine fonctionne aujourd'hui avec Google Agenda. Si votre salon utilise un autre logiciel, on regarde ensemble la meilleure organisation avant l'essai.",
+      "faq.q5": "Que deviennent les données de mes clients ?",
+      "faq.a5": "Elles servent uniquement à répondre aux clients et à gérer leurs rendez-vous. Elles ne sont ni vendues ni utilisées pour de la publicité. Les détails sont dans la politique de confidentialité en bas de page.",
+      "faq.q6": "Combien ça coûte ?",
+      "faq.a6": "L'essai de 2 semaines est gratuit. Ensuite, l'abonnement mensuel dépend du volume de messages de votre salon, et on le fixe ensemble après l'essai.",
+      "about.title": "Qui est derrière Yasmine",
+      "about.text": "Yasmine est conçue, développée et maintenue par Hamza Mihoubi, développeur spécialisé dans les assistants conversationnels. Lumière Hair & Beauty Studio est un salon fictif créé pour cette démo. Chaque salon qui utilise Yasmine est accompagné directement par la personne qui a construit l'outil.",
+      "id.name": "Raison sociale",
+      "id.status": "Statut",
+      "id.statusv": "Auto-entrepreneur (ANAE)",
+      "id.activity": "Activité",
+      "id.activityv": "Développeur de chatbot",
+      "id.city": "Ville",
+      "id.cityv": "Bougara, Blida, Algérie",
+      "final.title": "Ce soir, des clients vont écrire à votre salon.",
+      "final.text": "Faites en sorte que quelqu'un leur réponde.",
+      "final.cta": "Démarrer l'essai gratuit",
+      "legal.aria": "Contact et confidentialité",
+      "contact.title": "Contact",
+      "contact.phone": "Téléphone et WhatsApp",
+      "contact.email": "E-mail",
+      "contact.address": "Adresse",
+      "privacy.title": "Politique de confidentialité",
+      "privacy.intro": "Cette politique explique comment Hamza Mihoubi, auto-entrepreneur, traite les données personnelles lorsque des clients échangent avec Yasmine sur WhatsApp, Messenger ou un site web au nom d'un salon.",
+      "privacy.h1": "Données traitées",
+      "privacy.l1": "Le numéro WhatsApp ou l'identifiant Messenger du client, et son nom.",
+      "privacy.l2": "Le contenu des messages et des messages vocaux envoyés à l'assistante.",
+      "privacy.l3": "Les informations de rendez-vous : date, heure et prestation demandée.",
+      "privacy.h2": "Utilisation",
+      "privacy.p2": "Ces données servent uniquement à répondre au client, à gérer ses rendez-vous avec le salon concerné et à transmettre la conversation à l'équipe du salon si nécessaire. Elles ne sont ni vendues ni utilisées à des fins publicitaires.",
+      "privacy.h3": "Prestataires techniques",
+      "privacy.p3": "Le service s'appuie sur des prestataires pour fonctionner : WhatsApp et Messenger (Meta) pour les messages, Google pour l'agenda et l'historique des échanges, et des services d'intelligence artificielle pour comprendre les messages écrits et vocaux. Les données leur sont transmises uniquement dans ce but.",
+      "privacy.p3b": "Conversation de démonstration du site : les messages saisis dans la démo en haut de cette page sont envoyés au serveur de Hamza Mihoubi, puis au service d'intelligence artificielle qui génère les réponses de Yasmine. Ils servent uniquement à produire ces réponses. Merci de ne pas y indiquer d'informations personnelles.",
+      "privacy.h4": "Conservation",
+      "privacy.p4": "Les données sont conservées le temps nécessaire à la gestion des rendez-vous et à la relation entre le client et le salon, puis supprimées. Les rendez-vous de démonstration pris sur ce site sont supprimés automatiquement après 24 heures.",
+      "privacy.h5": "Vos droits",
+      "privacy.p5": "Vous pouvez demander l'accès, la correction ou la suppression de vos données en écrivant à l'adresse e-mail indiquée dans la section Contact.",
+      "privacy.updated": "Dernière mise à jour : novembre 2026.",
+      "footer.legal": "© 2026 Hamza Mihoubi, auto-entrepreneur (ANAE), développeur de chatbot. Bougara, Blida, Algérie. Lumière Hair & Beauty Studio est un salon fictif de démonstration.",
+      "wa.aria": "Écrire sur WhatsApp",
+      "wa.text": "Bonjour, je souhaite essayer Yasmine pour mon salon."
+    },
+    es: {
+      "brand.sub": "Hair & Beauty Studio",
+      "nav.aria": "Navegación principal",
+      "nav.demo": "Demo",
+      "nav.how": "Funciones",
+      "nav.pricing": "Precio",
+      "nav.faq": "Preguntas",
+      "nav.lang": "Idioma del sitio",
+      "nav.cta": "Prueba gratis",
+      "hero.eyebrow": "Demo en directo · Lumière Hair & Beauty Studio",
+      "hero.title": "La recepcionista con IA de tu salón, atendiendo a tus clientes día y noche.",
+      "chat.intro": "Pruébala ahora: estás hablando con Yasmine, la recepcionista de Lumière Hair & Beauty Studio, un salón ficticio de demostración.",
+      "chat.disclaimer": "Demo con un salón ficticio: los precios, la dirección y el horario son valores de demostración. Usa un nombre inventado y no compartas datos personales.",
+      "hero.more": "Saber más",
+      "hero.lede": "Yasmine atiende a tus clientes por WhatsApp, Messenger y tu web, a cualquier hora. Explica tus servicios y precios, encuentra un hueco libre en tu Google Calendar y reserva, cambia y cancela citas, en inglés, francés, español y árabe.",
+      "hero.cta1": "Quiero Yasmine para mi salón",
+      "hero.cta2": "Ver ejemplos",
+      "hero.note": "2 semanas de prueba gratis, sin compromiso, configurada con tus servicios, precios y horario.",
+      "pain.title": "Cada mensaje sin respuesta es una clienta que reserva en otro salón.",
+      "pain.1t": "Después del cierre",
+      "pain.1d": "Las ganas de un cambio de look llegan por la noche y el domingo. A la mañana siguiente, parte de las clientas ya ha reservado en otro sitio.",
+      "pain.2t": "Con las manos ocupadas",
+      "pain.2d": "Tu equipo está cortando, tiñendo y haciendo uñas. Nadie puede coger el teléfono ni contestar WhatsApp en pleno balayage.",
+      "pain.3t": "Siempre las mismas preguntas",
+      "pain.3d": "«¿Cuánto cuesta un balayage?», «¿Abrís los sábados?», «¿Tenéis hueco mañana?». La mayoría de los mensajes pregunta lo mismo.",
+      "demo.title": "Mira cómo Yasmine gestiona peticiones reales de un salón",
+      "demo.lede": "Elige una situación. Junto al teléfono verás lo que pasa en el salón.",
+      "demo.tabs": "Situaciones",
+      "tab.booking": "Reservar un corte",
+      "tab.reschedule": "Cambiar cita",
+      "tab.cancel": "Cancelar",
+      "tab.voice": "Nota de voz",
+      "tab.info": "Precios y horario",
+      "tab.urgent": "Reacción tras un tinte",
+      "hero.salon": "Lumière Hair & Beauty",
+      "hero.status": "Yasmine está respondiendo",
+      "panel.title": "En el salón",
+      "panel.lang": "Idioma del cliente",
+      "panel.agenda": "Agenda y equipo",
+      "panel.action": "Lo que se ha hecho",
+      "panel.none": "Sin cambios",
+      "panel.waiting": "Yasmine está respondiendo al cliente…",
+      "panel.foot": "Ejemplos de demostración con el salón ficticio Lumière y su lista de precios de demo. Antes de ponerla en marcha, validas las respuestas de Yasmine con la información de tu salón.",
+      "feat.title": "Lo que Yasmine se encarga de hacer, día y noche.",
+      "feat.lede": "Se ocupa de los mensajes repetitivos para que tu equipo se centre en las clientas que están en el sillón.",
+      "feat.1t": "Citas adaptadas a cada servicio",
+      "feat.1d": "Solo ofrece horas que estén libres durante todo el servicio, desde un corte de 30 minutos hasta un balayage de 3 horas, y anota la cita en tu Google Calendar.",
+      "feat.2t": "Cambios y cancelaciones",
+      "feat.2d": "Los clientes cambian o cancelan por mensaje. La hora liberada queda disponible al momento para otra persona.",
+      "feat.3t": "Tus servicios, precios y normas",
+      "feat.3d": "Cortes, color, balayage, tratamientos, uñas, faciales: responde con tu lista de precios, duraciones, horario y normas, nunca con cifras inventadas.",
+      "feat.4t": "Notas de voz",
+      "feat.4d": "Muchos clientes prefieren hablar. En WhatsApp y Messenger, Yasmine transcribe las notas de voz en el idioma principal de tu salón y responde por escrito.",
+      "feat.5t": "Inglés, francés, español y árabe",
+      "feat.5d": "Detecta el idioma del cliente en cada mensaje, aunque escriba deprisa y sin tildes, y responde con naturalidad en ese idioma.",
+      "feat.6t": "Pasa el caso a tu equipo",
+      "feat.6d": "Una queja, una reacción tras un tratamiento, una petición especial: avisa a tu equipo por WhatsApp en lugar de improvisar.",
+      "langs.title": "Una misma petición, escrita de cuatro formas.",
+      "langs.text": "Yasmine entiende las cuatro y responde a cada cliente en su idioma.",
+      "langs.en": "Inglés",
+      "langs.es": "Español",
+      "langs.fr": "Francés",
+      "langs.ar": "Árabe",
+      "langs.understood": "Entendido",
+      "langs.k1": "Petición",
+      "langs.v1": "cita",
+      "langs.k2": "Servicio",
+      "langs.v2": "corte de pelo",
+      "langs.k3": "Día",
+      "langs.v3": "mañana",
+      "steps.title": "Cómo es la puesta en marcha",
+      "steps.1t": "Configuramos Yasmine para tu salón",
+      "steps.1d": "Tus servicios, precios, duraciones, horario y normas de reserva. Validas sus respuestas antes de ponerla en marcha.",
+      "steps.2t": "La pruebas 2 semanas con clientes reales",
+      "steps.2d": "Gratis y sin compromiso. Tu agenda sigue bajo tu control en todo momento.",
+      "steps.3t": "Decidimos juntos el siguiente paso",
+      "steps.3d": "Si le ahorra tiempo a tu salón, acordamos una suscripción mensual adaptada a tu volumen.",
+      "calc.title": "¿Cuántas citas se te escapan cada mes?",
+      "calc.lede": "Introduce tus propios números. El cálculo se hace en tu navegador; no se envía nada.",
+      "calc.l1": "Mensajes recibidos fuera de horario o con las manos ocupadas, por semana",
+      "calc.l2": "Porcentaje de esos mensajes que son peticiones de cita",
+      "calc.l3": "Porcentaje de clientes que no vuelven a escribir",
+      "calc.l4": "Precio medio de una visita al salón",
+      "calc.r1": "citas que podrías estar perdiendo cada mes",
+      "calc.r2": "en servicios que no se hacen, al mes",
+      "calc.note": "Estimación orientativa, calculada solo con los números que introduces.",
+      "price.title": "Empieza con dos semanas gratis",
+      "price.lede": "Ves a Yasmine trabajar con tus clientes reales antes de tomar cualquier decisión.",
+      "price.tag": "Prueba gratis",
+      "price.free": "Gratis",
+      "price.dur": "durante 2 semanas",
+      "price.i1": "Yasmine configurada con los servicios, precios y horario de tu salón",
+      "price.i2": "Conexión con tu Google Calendar",
+      "price.i3": "Seguimiento de las conversaciones durante toda la prueba",
+      "price.i4": "Sin compromiso y sin pago",
+      "price.afterTitle": "¿Y después de la prueba?",
+      "price.after": "Una suscripción mensual según el volumen de mensajes de tu salón, que acordamos juntos. Puedes dejarlo cuando quieras.",
+      "price.s1": "Nada que instalar en los ordenadores del salón",
+      "price.s2": "Una persona de contacto directa para tu salón",
+      "price.cta": "Pedir mi prueba gratis",
+      "faq.title": "Preguntas frecuentes",
+      "faq.q1": "¿Yasmine sustituye a mi recepcionista?",
+      "faq.a1": "No. Se encarga de los mensajes repetitivos y de las peticiones fuera de horario. Tu equipo se queda con los casos que necesitan a una persona, y Yasmine se los pasa.",
+      "faq.q2": "¿Pueden los clientes elegir una estilista concreta?",
+      "faq.a2": "Hoy Yasmine reserva en una agenda común del salón: cada hora admite una cita. Puede anotar la preferencia de estilista para tu equipo, pero no gestiona horarios separados por persona.",
+      "faq.q3": "¿Y si una clienta pregunta por una alergia o una reacción?",
+      "faq.a3": "Yasmine nunca da consejos médicos ni sobre la piel. Recomienda buscar atención médica si es urgente y avisa a tu equipo para que una persona se ocupe.",
+      "faq.q4": "Ya uso un programa de reservas.",
+      "faq.a4": "Hoy Yasmine trabaja con Google Calendar. Si tu salón usa otro programa, vemos juntos la mejor opción antes de la prueba.",
+      "faq.q5": "¿Qué pasa con los datos de mis clientes?",
+      "faq.a5": "Solo se usan para responder a los clientes y gestionar sus citas. Nunca se venden ni se usan para publicidad. Tienes los detalles en la política de privacidad, al final de la página.",
+      "faq.q6": "¿Cuánto cuesta?",
+      "faq.a6": "La prueba de 2 semanas es gratis. Después, la suscripción mensual depende del volumen de mensajes de tu salón, y la acordamos juntos tras la prueba.",
+      "about.title": "Quién está detrás de Yasmine",
+      "about.text": "Yasmine la diseña, desarrolla y mantiene Hamza Mihoubi, desarrollador especializado en asistentes conversacionales. Lumière Hair & Beauty Studio es un salón ficticio creado para esta demo. Cada salón que usa Yasmine cuenta con el acompañamiento directo de quien creó la herramienta.",
+      "id.name": "Nombre comercial",
+      "id.status": "Forma jurídica",
+      "id.statusv": "Autónomo (ANAE)",
+      "id.activity": "Actividad",
+      "id.activityv": "Desarrollador de chatbots",
+      "id.city": "Ciudad",
+      "id.cityv": "Bougara, Blida, Argelia",
+      "final.title": "Esta noche, tus clientes escribirán a tu salón.",
+      "final.text": "Asegúrate de que alguien les responda.",
+      "final.cta": "Empezar la prueba gratis",
+      "legal.aria": "Contacto y privacidad",
+      "contact.title": "Contacto",
+      "contact.phone": "Teléfono y WhatsApp",
+      "contact.email": "Correo electrónico",
+      "contact.address": "Dirección",
+      "privacy.title": "Política de privacidad",
+      "privacy.intro": "Esta política explica cómo Hamza Mihoubi, autónomo, trata los datos personales cuando los clientes hablan con Yasmine por WhatsApp, Messenger o una web en nombre de un salón.",
+      "privacy.h1": "Datos tratados",
+      "privacy.l1": "El número de WhatsApp o el identificador de Messenger del cliente, y su nombre.",
+      "privacy.l2": "El contenido de los mensajes y notas de voz enviados a la asistente.",
+      "privacy.l3": "Los datos de la cita: fecha, hora y servicio solicitado.",
+      "privacy.h2": "Uso",
+      "privacy.p2": "Estos datos solo se usan para responder al cliente, gestionar sus citas con el salón correspondiente y pasar la conversación al equipo del salón cuando haga falta. Nunca se venden ni se usan con fines publicitarios.",
+      "privacy.h3": "Proveedores técnicos",
+      "privacy.p3": "El servicio funciona con varios proveedores: WhatsApp y Messenger (Meta) para los mensajes, Google para la agenda y el registro de conversaciones, y servicios de inteligencia artificial para entender los mensajes escritos y de voz. Los datos se comparten con ellos solo con este fin.",
+      "privacy.p3b": "Chat de demostración de esta web: los mensajes que escribes en la demo de la parte superior se envían al servidor de Hamza Mihoubi y después al servicio de inteligencia artificial que genera las respuestas de Yasmine. Solo se usan para producir esas respuestas. Por favor, no escribas datos personales.",
+      "privacy.h4": "Conservación",
+      "privacy.p4": "Los datos se conservan el tiempo necesario para gestionar las citas y la relación entre el cliente y el salón, y después se eliminan. Las citas de demostración hechas en esta web se borran automáticamente a las 24 horas.",
+      "privacy.h5": "Tus derechos",
+      "privacy.p5": "Puedes pedir el acceso, la corrección o la eliminación de tus datos escribiendo al correo indicado en la sección Contacto.",
+      "privacy.updated": "Última actualización: noviembre de 2026.",
+      "footer.legal": "© 2026 Hamza Mihoubi, autónomo (ANAE), desarrollador de chatbots. Bougara, Blida, Argelia. Lumière Hair & Beauty Studio es un salón ficticio de demostración.",
+      "wa.aria": "Escribir por WhatsApp",
+      "wa.text": "Hola, me gustaría probar Yasmine para mi salón."
+    },
+    ar: {
+      "brand.sub": "Hair & Beauty Studio",
+      "nav.aria": "التنقل الرئيسي",
+      "nav.demo": "تجربة حيّة",
+      "nav.how": "المميزات",
+      "nav.pricing": "السعر",
+      "nav.faq": "أسئلة",
+      "nav.lang": "لغة الموقع",
+      "nav.cta": "تجربة مجانية",
+      "hero.eyebrow": "تجربة حيّة · Lumière Hair & Beauty Studio",
+      "hero.title": "موظفة الاستقبال الذكية لصالونك، ترد على عملائك ليلاً ونهاراً.",
+      "chat.intro": "جرّبها الآن: أنت تتحدث مع ياسمين، موظفة استقبال Lumière Hair & Beauty Studio، وهو صالون وهمي للعرض التجريبي.",
+      "chat.disclaimer": "عرض تجريبي بصالون وهمي: الأسعار والعنوان وأوقات العمل قيم تجريبية. استعمل اسماً وهمياً ولا تكتب معلومات شخصية.",
+      "hero.more": "اعرف المزيد",
+      "hero.lede": "ياسمين ترد على عملائك عبر واتساب وماسنجر وموقعك في أي وقت. تشرح خدماتك وأسعارك، وتجد وقتاً شاغراً في أجندة Google، وتحجز المواعيد وتغيّرها وتلغيها، بالإنجليزية والفرنسية والإسبانية والعربية.",
+      "hero.cta1": "ياسمين لصالوني",
+      "hero.cta2": "شاهد أمثلة",
+      "hero.note": "أسبوعان مجاناً بدون أي التزام، مع إعداد ياسمين بخدماتك وأسعارك وأوقات عملك.",
+      "pain.title": "كل رسالة بدون رد هي عميلة تحجز في صالون آخر.",
+      "pain.1t": "بعد الإغلاق",
+      "pain.1d": "الرغبة في إطلالة جديدة تأتي مساءً ويوم الأحد. في الصباح، يكون جزء من العملاء قد حجز في مكان آخر.",
+      "pain.2t": "الأيدي مشغولة",
+      "pain.2d": "فريقك يقص ويصبغ ويعتني بالأظافر. لا أحد يستطيع الرد على الهاتف أو واتساب في منتصف البالياج.",
+      "pain.3t": "نفس الأسئلة كل يوم",
+      "pain.3d": "«كم سعر البالياج؟»، «هل تفتحون يوم السبت؟»، «هل يوجد موعد غداً؟». معظم الرسائل تسأل نفس الشيء.",
+      "demo.title": "شاهد ياسمين وهي تتعامل مع طلبات حقيقية في صالون",
+      "demo.lede": "اختر حالة. بجانب الهاتف، ما يحدث في الصالون.",
+      "demo.tabs": "الحالات",
+      "tab.booking": "حجز قصة شعر",
+      "tab.reschedule": "تغيير موعد",
+      "tab.cancel": "إلغاء موعد",
+      "tab.voice": "رسالة صوتية",
+      "tab.info": "الأسعار والأوقات",
+      "tab.urgent": "تفاعل بعد الصبغة",
+      "hero.salon": "Lumière Hair & Beauty",
+      "hero.status": "ياسمين ترد",
+      "panel.title": "في الصالون",
+      "panel.lang": "لغة العميل",
+      "panel.agenda": "الأجندة والفريق",
+      "panel.action": "ما تم",
+      "panel.none": "لا تغيير",
+      "panel.waiting": "ياسمين ترد على العميل…",
+      "panel.foot": "أمثلة توضيحية مع صالون Lumière الوهمي وقائمة أسعاره التجريبية. قبل التشغيل، توافق على أجوبة ياسمين بمعلومات صالونك.",
+      "feat.title": "ما تتكفل به ياسمين، ليلاً ونهاراً.",
+      "feat.lede": "تتكفل بالرسائل المتكررة، ليتفرغ فريقك للعملاء الحاضرين في الصالون.",
+      "feat.1t": "مواعيد تناسب كل خدمة",
+      "feat.1d": "تقترح فقط الأوقات الشاغرة فعلاً طوال مدة الخدمة، من قصة شعر لمدة 30 دقيقة إلى بالياج لمدة 3 ساعات، وتسجل الموعد في أجندة Google.",
+      "feat.2t": "التغيير والإلغاء",
+      "feat.2d": "العميل يغيّر أو يلغي موعده برسالة، والوقت المحرَّر يصبح متاحاً فوراً لشخص آخر.",
+      "feat.3t": "خدماتك وأسعارك وقواعدك",
+      "feat.3d": "القص، الصبغة، البالياج، العلاجات، الأظافر، العناية بالوجه: تجيب بقائمة أسعارك ومدد خدماتك وأوقاتك وقواعدك، وليس بأرقام مختلقة.",
+      "feat.4t": "الرسائل الصوتية",
+      "feat.4d": "كثير من العملاء يفضلون الكلام. على واتساب وماسنجر، تحوّل ياسمين الرسائل الصوتية إلى نص باللغة الرئيسية لصالونك وترد كتابياً.",
+      "feat.5t": "الإنجليزية والفرنسية والإسبانية والعربية",
+      "feat.5d": "تكتشف لغة العميل في كل رسالة، حتى لو كتب بسرعة، وترد بشكل طبيعي بنفس اللغة.",
+      "feat.6t": "التحويل إلى فريقك",
+      "feat.6d": "شكوى، تفاعل بعد علاج، طلب خاص: تنبّه فريقك عبر واتساب بدل الارتجال.",
+      "langs.title": "نفس الطلب، مكتوب بأربع طرق.",
+      "langs.text": "ياسمين تفهم اللغات الأربع وترد على كل عميل بلغته.",
+      "langs.en": "الإنجليزية",
+      "langs.es": "الإسبانية",
+      "langs.fr": "الفرنسية",
+      "langs.ar": "العربية",
+      "langs.understood": "المفهوم",
+      "langs.k1": "الطلب",
+      "langs.v1": "موعد",
+      "langs.k2": "الخدمة",
+      "langs.v2": "قص الشعر",
+      "langs.k3": "اليوم",
+      "langs.v3": "غداً",
+      "steps.title": "كيف يتم التشغيل",
+      "steps.1t": "نُعدّ ياسمين لصالونك",
+      "steps.1d": "خدماتك، أسعارك، مدد الخدمات، أوقات العمل وقواعد الحجز. توافق على أجوبتها قبل التشغيل.",
+      "steps.2t": "تجربها أسبوعين مع عملائك الحقيقيين",
+      "steps.2d": "مجاناً وبدون التزام. أجندتك تبقى تحت تصرفك في أي وقت.",
+      "steps.3t": "نقرر معاً الخطوة التالية",
+      "steps.3d": "إذا وفّرت الوقت لصالونك، نحدد اشتراكاً شهرياً حسب حجم عملك.",
+      "calc.title": "كم موعداً يضيع منك كل شهر؟",
+      "calc.lede": "أدخل أرقامك. الحساب يتم في متصفحك، ولا يُرسل أي شيء.",
+      "calc.l1": "الرسائل التي تصل خارج أوقات العمل أو أثناء الانشغال، في الأسبوع",
+      "calc.l2": "نسبة طلبات المواعيد بين هذه الرسائل",
+      "calc.l3": "نسبة العملاء الذين لا يعيدون الكتابة",
+      "calc.l4": "متوسط سعر الزيارة للصالون",
+      "calc.r1": "موعد قد يضيع كل شهر",
+      "calc.r2": "من الخدمات غير المنجزة شهرياً",
+      "calc.note": "تقدير تقريبي، محسوب فقط من الأرقام التي أدخلتها.",
+      "price.title": "ابدأ بأسبوعين مجاناً",
+      "price.lede": "ترى ياسمين تعمل مع عملائك الحقيقيين قبل أي قرار.",
+      "price.tag": "تجربة مجانية",
+      "price.free": "مجاناً",
+      "price.dur": "لمدة أسبوعين",
+      "price.i1": "ياسمين مُعدّة بخدمات صالونك وأسعاره وأوقاته",
+      "price.i2": "ربط مع أجندة Google الخاصة بك",
+      "price.i3": "متابعة المحادثات طوال التجربة",
+      "price.i4": "بدون التزام وبدون دفع",
+      "price.afterTitle": "وبعد التجربة؟",
+      "price.after": "اشتراك شهري حسب حجم رسائل صالونك، نحدده معاً. تتوقف متى شئت.",
+      "price.s1": "لا شيء يُثبَّت على حواسيب الصالون",
+      "price.s2": "محاور مباشر لصالونك",
+      "price.cta": "اطلب تجربتي المجانية",
+      "faq.title": "أسئلة شائعة",
+      "faq.q1": "هل تعوّض ياسمين موظفة الاستقبال؟",
+      "faq.a1": "لا. تتكفل بالرسائل المتكررة والطلبات خارج أوقات العمل. فريقك يحتفظ بالحالات التي تحتاج شخصاً، وياسمين تحوّلها إليه.",
+      "faq.q2": "هل يمكن للعملاء اختيار مصففة معينة؟",
+      "faq.a2": "حالياً تحجز ياسمين في أجندة مشتركة للصالون: كل وقت يتسع لموعد واحد. يمكنها تسجيل تفضيل المصففة لفريقك، لكنها لا تدير جدولاً منفصلاً لكل شخص.",
+      "faq.q3": "ماذا لو سألت عميلة عن حساسية أو تفاعل؟",
+      "faq.a3": "ياسمين لا تعطي أي نصيحة طبية أو تتعلق بالبشرة. تنصح بطلب المساعدة الطبية في الحالات المستعجلة وتنبّه فريقك ليتابع شخص الأمر.",
+      "faq.q4": "أستعمل برنامجاً للحجز من قبل.",
+      "faq.a4": "ياسمين تعمل حالياً مع أجندة Google. إذا كان صالونك يستعمل برنامجاً آخر، نبحث معاً عن أفضل تنظيم قبل التجربة.",
+      "faq.q5": "ماذا عن بيانات عملائي؟",
+      "faq.a5": "تُستعمل فقط للرد على العملاء وتسيير مواعيدهم. لا تُباع ولا تُستعمل للإشهار. التفاصيل في سياسة الخصوصية أسفل الصفحة.",
+      "faq.q6": "كم التكلفة؟",
+      "faq.a6": "التجربة لمدة أسبوعين مجانية. بعدها، الاشتراك الشهري يعتمد على حجم رسائل صالونك، ونحدده معاً بعد التجربة.",
+      "about.title": "من وراء ياسمين",
+      "about.text": "ياسمين مصمَّمة ومطوَّرة ومتابَعة من طرف حمزة ميهوبي (Hamza Mihoubi)، مطوّر متخصص في المساعدين المحادثاتيين. Lumière Hair & Beauty Studio صالون وهمي أُنشئ لهذا العرض. كل صالون يستعمل ياسمين يرافقه مباشرة الشخص الذي بنى الأداة.",
+      "id.name": "الاسم التجاري",
+      "id.status": "الصفة",
+      "id.statusv": "مقاول ذاتي (ANAE)",
+      "id.activity": "النشاط",
+      "id.activityv": "مطوّر شات بوت",
+      "id.city": "المدينة",
+      "id.cityv": "بوقرة، البليدة، الجزائر",
+      "final.title": "هذا المساء، سيكتب عملاء لصالونك.",
+      "final.text": "تأكد أن هناك من يرد عليهم.",
+      "final.cta": "ابدأ التجربة المجانية",
+      "legal.aria": "الاتصال والخصوصية",
+      "contact.title": "اتصل بنا",
+      "contact.phone": "الهاتف وواتساب",
+      "contact.email": "البريد الإلكتروني",
+      "contact.address": "العنوان",
+      "privacy.title": "سياسة الخصوصية",
+      "privacy.intro": "توضح هذه السياسة كيف يعالج حمزة ميهوبي (Hamza Mihoubi)، مقاول ذاتي، المعطيات الشخصية عندما يتواصل العملاء مع ياسمين عبر واتساب أو ماسنجر أو موقع إلكتروني باسم صالون.",
+      "privacy.h1": "المعطيات المعالجة",
+      "privacy.l1": "رقم واتساب العميل أو معرّفه في ماسنجر، واسمه.",
+      "privacy.l2": "محتوى الرسائل والرسائل الصوتية المرسلة إلى المساعدة.",
+      "privacy.l3": "معلومات الموعد: التاريخ، الوقت، والخدمة المطلوبة.",
+      "privacy.h2": "الاستعمال",
+      "privacy.p2": "تُستعمل هذه المعطيات فقط للرد على العميل، وتسيير مواعيده مع الصالون المعني، وتحويل المحادثة إلى فريق الصالون عند الحاجة. لا تُباع ولا تُستعمل لأغراض إشهارية.",
+      "privacy.h3": "مزوّدو الخدمات التقنية",
+      "privacy.p3": "تعتمد الخدمة على مزوّدين لتعمل: واتساب وماسنجر (Meta) للرسائل، Google للأجندة وسجل المحادثات، وخدمات ذكاء اصطناعي لفهم الرسائل المكتوبة والصوتية. تُرسل المعطيات إليهم لهذا الغرض فقط.",
+      "privacy.p3b": "المحادثة التجريبية في الموقع: الرسائل التي تكتبها في التجربة أعلى هذه الصفحة تُرسل إلى خادم حمزة ميهوبي (Hamza Mihoubi)، ثم إلى خدمة الذكاء الاصطناعي التي تولّد ردود ياسمين. تُستعمل فقط لإنتاج هذه الردود. نرجو عدم كتابة معلومات شخصية فيها.",
+      "privacy.h4": "مدة الحفظ",
+      "privacy.p4": "تُحفظ المعطيات طوال المدة اللازمة لتسيير المواعيد والعلاقة بين العميل والصالون، ثم تُحذف. المواعيد التجريبية المحجوزة في هذا الموقع تُحذف تلقائياً بعد 24 ساعة.",
+      "privacy.h5": "حقوقك",
+      "privacy.p5": "يمكنك طلب الاطلاع على معطياتك أو تصحيحها أو حذفها بمراسلة البريد الإلكتروني المذكور في قسم الاتصال.",
+      "privacy.updated": "آخر تحديث: نوفمبر 2026.",
+      "footer.legal": "© 2026 Hamza Mihoubi (حمزة ميهوبي)، مقاول ذاتي (ANAE)، مطوّر شات بوت. بوقرة، البليدة، الجزائر. Lumière Hair & Beauty Studio صالون وهمي للعرض التجريبي.",
+      "wa.aria": "راسلنا على واتساب",
+      "wa.text": "مرحباً، أود تجربة ياسمين لصالوني."
+    }
+  };
+  // English strings used only by the script (the rest of the English text is in the HTML).
+  var EN_EXTRA = { "panel.none": "No change", "panel.waiting": "Yasmine is replying to the client…", "wa.text": "Hello, I'd like to try Yasmine for my salon.", "wa.aria": "Message us on WhatsApp" };
+
+  var lang = "en";
+  var htmlCache = new WeakMap();
+  var ariaCache = new WeakMap();
+
+  function t(key) {
+    if (lang !== "en" && I18N[lang] && I18N[lang][key]) return I18N[lang][key];
+    return EN_EXTRA[key] || null;
+  }
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+  function updateWaLinks() {
+    var href = "https://wa.me/213777744607?text=" + encodeURIComponent(t("wa.text"));
+    document.querySelectorAll(".js-wa").forEach(function (a) { a.href = href; });
+  }
+
+  function setLang(next) {
+    if (LANGS.indexOf(next) < 0) next = "en";
+    lang = next;
+    var root = document.documentElement;
+    root.lang = next;
+    root.dir = next === "ar" ? "rtl" : "ltr";
+    var dict = I18N[next] || {};
+    document.querySelectorAll("[data-i18n]").forEach(function (el) {
+      if (!htmlCache.has(el)) htmlCache.set(el, el.innerHTML);
+      var key = el.getAttribute("data-i18n");
+      el.innerHTML = next !== "en" && dict[key] ? esc(dict[key]) : htmlCache.get(el);
+    });
+    document.querySelectorAll("[data-i18n-aria]").forEach(function (el) {
+      if (!ariaCache.has(el)) ariaCache.set(el, el.getAttribute("aria-label") || "");
+      var key = el.getAttribute("data-i18n-aria");
+      el.setAttribute("aria-label", next !== "en" && dict[key] ? dict[key] : ariaCache.get(el));
+    });
+    document.getElementById("langSelect").value = next;
+    updateWaLinks();
+    chatFollowSite(next);
+    if (currentScenario) renderPanel(currentScenario, panelDone);
+    updateCalc();
+    try { localStorage.setItem("lumiere-lang", next); } catch (e) {}
+  }
+
+  /* ---------- Chat engine ---------- */
+  var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, reduceMotion ? 0 : ms); }); }
+
+  function waveHTML() {
+    var h = [6, 12, 18, 10, 22, 14, 8, 16, 24, 12, 6, 14, 20, 10, 16, 8, 12, 18, 9, 14, 6, 10];
+    return h.map(function (v) { return '<i style="height:' + v + 'px"></i>'; }).join("");
+  }
+
+  function bubble(m) {
+    var el = document.createElement("div");
+    if (m.from === "system") {
+      el.className = "msg system";
+      el.textContent = m[lang] || m.en;
+      return el;
+    }
+    el.className = "msg " + m.from;
+    if (m.voice) {
+      el.innerHTML = '<div class="voice"><span class="voice-play"><svg viewBox="0 0 12 12" fill="currentColor"><path d="M2 1l9 5-9 5z"/></svg></span><span class="wave">' + waveHTML() + '</span><span class="voice-len">' + m.voice + "</span></div>";
+    } else {
+      var p = document.createElement("div");
+      p.dir = "auto";
+      p.textContent = m.text;
+      el.appendChild(p);
+    }
+    var time = document.createElement("time");
+    time.textContent = m.time + (m.from === "client" ? " ✓✓" : "");
+    el.appendChild(time);
+    return el;
+  }
+
+  function typingEl() {
+    var el = document.createElement("div");
+    el.className = "typing";
+    el.innerHTML = "<i></i><i></i><i></i>";
+    return el;
+  }
+
+  function play(chat, messages, onStep) {
+    var run = (chat._run || 0) + 1;
+    chat._run = run;
+    chat.innerHTML = "";
+    var alive = function () { return chat._run === run; };
+    var seq = Promise.resolve();
+    messages.forEach(function (m, i) {
+      seq = seq.then(function () {
+        if (!alive()) return;
+        if (m.from === "bot") {
+          var ty = typingEl();
+          chat.appendChild(ty);
+          return sleep(1100).then(function () {
+            if (!alive()) return;
+            ty.remove();
+            chat.appendChild(bubble(m));
+            if (onStep) onStep(i, m);
+            return sleep(900);
+          });
+        }
+        chat.appendChild(bubble(m));
+        if (onStep) onStep(i, m);
+        return sleep(m.from === "system" ? 700 : 1000);
+      });
+    });
+    return seq.then(function () { return alive(); });
+  }
+
+  /* ---------- Live demo chat (hero) ---------- */
+  var WA_NUMBER = "213777744607";
+  var CHAT_UI = {
+    en: {
+      region: "Demo conversation with Yasmine", badge: "Demo", status: "online", legend: "Conversation language",
+      log: "Conversation with Yasmine", replies: "Suggested messages", input: "Your message", placeholder: "Type a message…",
+      limitPlaceholder: "Demo limit reached", send: "Send", you: "You: ", bot: "Yasmine: ",
+      rest: "The demo is resting right now. Leave us a message on WhatsApp or call us: we'll show you Yasmine live.",
+      limit: "You've reached this demo's message limit. To continue, message us on WhatsApp or call: we'll show you Yasmine with your own salon's details.",
+      wa: "Message on WhatsApp", call: "Call",
+      waText: "Hello, I tried the Lumière salon demo of Yasmine on your website. Could you get in touch?"
+    },
+    fr: {
+      region: "Démo de conversation avec Yasmine", badge: "Démo", status: "en ligne", legend: "Langue de la conversation",
+      log: "Conversation avec Yasmine", replies: "Messages suggérés", input: "Votre message", placeholder: "Écrivez un message…",
+      limitPlaceholder: "Limite de la démo atteinte", send: "Envoyer", you: "Vous : ", bot: "Yasmine : ",
+      rest: "La démo se repose pour le moment. Laissez-nous un message sur WhatsApp ou appelez-nous : on vous montre Yasmine en direct.",
+      limit: "Vous avez atteint la limite de messages de cette démo. Pour continuer, écrivez-nous sur WhatsApp ou appelez : on vous montre Yasmine avec les informations de votre salon.",
+      wa: "Écrire sur WhatsApp", call: "Appeler",
+      waText: "Bonjour, j'ai essayé la démo de Yasmine (salon Lumière) sur votre site. Pouvez-vous me recontacter ?"
+    },
+    es: {
+      region: "Conversación de demostración con Yasmine", badge: "Demo", status: "en línea", legend: "Idioma de la conversación",
+      log: "Conversación con Yasmine", replies: "Mensajes sugeridos", input: "Tu mensaje", placeholder: "Escribe un mensaje…",
+      limitPlaceholder: "Límite de la demo alcanzado", send: "Enviar", you: "Tú: ", bot: "Yasmine: ",
+      rest: "La demo está descansando ahora mismo. Déjanos un mensaje por WhatsApp o llámanos: te enseñamos Yasmine en directo.",
+      limit: "Has llegado al límite de mensajes de esta demo. Para continuar, escríbenos por WhatsApp o llámanos: te enseñamos Yasmine con los datos de tu salón.",
+      wa: "Escribir por WhatsApp", call: "Llamar",
+      waText: "Hola, he probado la demo de Yasmine (salón Lumière) en vuestra web. ¿Podéis contactarme?"
+    },
+    ar: {
+      region: "تجربة محادثة مع ياسمين", badge: "تجريبي", status: "متصلة الآن", legend: "لغة المحادثة",
+      log: "المحادثة مع ياسمين", replies: "رسائل مقترحة", input: "رسالتك", placeholder: "اكتب رسالة…",
+      limitPlaceholder: "انتهى حد الرسائل في هذا العرض", send: "إرسال", you: "أنت: ", bot: "ياسمين: ",
+      rest: "العرض التجريبي في استراحة الآن. اترك لنا رسالة على واتساب أو اتصل بنا، وسنريك ياسمين مباشرة.",
+      limit: "وصلت إلى حد الرسائل في هذا العرض. للمتابعة، راسلنا على واتساب أو اتصل بنا، ونريك ياسمين بمعلومات صالونك.",
+      wa: "راسلنا على واتساب", call: "اتصل بنا",
+      waText: "مرحباً، جربت عرض ياسمين (صالون Lumière) على موقعكم. هل يمكنكم التواصل معي؟"
+    }
+  };
+  var CHAT_GREETING = {
+    en: "Hello 👋 I'm Yasmine, the receptionist at Lumière Hair & Beauty Studio. I can tell you about our services and prices, or book, change or cancel an appointment. How can I help?",
+    fr: "Bonjour 👋 Je suis Yasmine, la réceptionniste de Lumière Hair & Beauty Studio. Je peux vous renseigner sur nos prestations et nos tarifs, ou prendre, déplacer ou annuler un rendez-vous. Que puis-je faire pour vous ?",
+    es: "¡Hola! 👋 Soy Yasmine, la recepcionista de Lumière Hair & Beauty Studio. Puedo informarte sobre nuestros servicios y precios, o reservar, cambiar o cancelar una cita. ¿En qué te ayudo?",
+    ar: "مرحباً 👋 أنا ياسمين، موظفة الاستقبال في Lumière Hair & Beauty Studio. يمكنني إخبارك عن خدماتنا وأسعارنا، أو حجز موعد أو تغييره أو إلغاؤه. كيف يمكنني مساعدتك؟"
+  };
+  var CHAT_CHIPS = {
+    en: ["Hi! I'd like to book a haircut for tomorrow.", "How much does balayage cost?", "Do you have any availability this Saturday?", "I'd like to reschedule my appointment.", "Can you tell me about your hair treatments?"],
+    fr: ["Bonjour, je voudrais prendre rendez-vous pour une coloration.", "Quels sont vos horaires ?", "Combien coûte un balayage ?"],
+    es: ["Hola, ¿tenéis disponibilidad para un corte de pelo mañana?", "¿Cuánto cuesta un balayage?", "¿Qué horario tenéis?"],
+    ar: ["أريد حجز موعد لقص الشعر", "ما هي أوقات العمل؟", "كم سعر البالياج؟"]
+  };
+
+  var liveChat = document.getElementById("liveChat");
+  var chatLog = document.getElementById("chatLog");
+  var chatReplies = document.getElementById("chatReplies");
+  var chatForm = document.getElementById("chatForm");
+  var chatInput = document.getElementById("chatInput");
+  var chatSend = document.getElementById("chatSend");
+  var chatHp = document.getElementById("chatHp");
+  var chatLangInputs = Array.prototype.slice.call(document.querySelectorAll('input[name="chatLang"]'));
+
+  var chatLang = "en";
+  var chatLangPicked = false;
+  var chatStarted = false;
+  var chatGreeted = false;
+  var chatPending = false;
+  var chatSessionMem = null;
+  var chatCountMem = 0;
+
+  function ssGet(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }
+  function ssSet(k, v) { try { sessionStorage.setItem(k, v); } catch (e) {} }
+
+  function chatSessionId() {
+    if (chatSessionMem) return chatSessionMem;
+    var id = ssGet("lumiere-chat-session");
+    if (!id) {
+      try { id = crypto.randomUUID(); } catch (e) { id = "web-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 12); }
+      ssSet("lumiere-chat-session", id);
+    }
+    chatSessionMem = id;
+    return id;
+  }
+  function chatCount() { return Math.max(chatCountMem, parseInt(ssGet("lumiere-chat-count"), 10) || 0); }
+  function chatBumpCount() { chatCountMem = chatCount() + 1; ssSet("lumiere-chat-count", String(chatCountMem)); }
+  function chatLimitReached() { return chatCount() >= CHAT_MAX_MESSAGES; }
+
+  function ui() { return CHAT_UI[chatLang] || CHAT_UI.en; }
+  function nowTime() { var d = new Date(); return ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2); }
+  function chatScroll() { chatLog.scrollTop = chatLog.scrollHeight; }
+
+  function chatBubble(from, text) {
+    var el = document.createElement("div");
+    el.className = "msg " + (from === "you" ? "client" : "bot");
+    var who = document.createElement("span");
+    who.className = "sr-only";
+    who.textContent = from === "you" ? ui().you : ui().bot;
+    var p = document.createElement("div");
+    p.className = "lc-text";
+    p.dir = "auto";
+    p.textContent = text;
+    var time = document.createElement("time");
+    time.setAttribute("aria-hidden", "true");
+    time.textContent = nowTime() + (from === "you" ? " ✓✓" : "");
+    el.appendChild(who); el.appendChild(p); el.appendChild(time);
+    chatLog.appendChild(el);
+    chatScroll();
+  }
+
+  /* Friendly note with WhatsApp + call buttons (demo offline, or limit reached) */
+  function chatNote(text) {
+    var u = ui();
+    var el = document.createElement("div");
+    el.className = "lc-note";
+    var p = document.createElement("p");
+    p.textContent = text;
+    var actions = document.createElement("div");
+    actions.className = "lc-actions";
+    var wa = document.createElement("a");
+    wa.href = "https://wa.me/" + WA_NUMBER + "?text=" + encodeURIComponent(u.waText);
+    wa.target = "_blank";
+    wa.rel = "noopener";
+    wa.textContent = u.wa;
+    var call = document.createElement("a");
+    call.href = "tel:+" + WA_NUMBER;
+    call.textContent = u.call;
+    actions.appendChild(wa); actions.appendChild(call);
+    el.appendChild(p); el.appendChild(actions);
+    chatLog.appendChild(el);
+    chatScroll();
+  }
+
+  function chatChips(list) {
+    chatReplies.innerHTML = "";
+    (list || []).forEach(function (label) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "lc-chip";
+      b.dir = "auto";
+      b.textContent = label;
+      b.disabled = chatPending;
+      b.addEventListener("click", function () { chatSendMessage(label); });
+      chatReplies.appendChild(b);
+    });
+  }
+
+  function chatSetPending(p) {
+    chatPending = p;
+    chatSend.disabled = p || chatLimitReached();
+    Array.prototype.forEach.call(chatReplies.querySelectorAll("button"), function (b) { b.disabled = p; });
+  }
+
+  function chatApplyLang() {
+    var u = ui();
+    var rtl = chatLang === "ar";
+    liveChat.dir = rtl ? "rtl" : "ltr";
+    liveChat.lang = chatLang;
+    liveChat.setAttribute("aria-label", u.region);
+    document.getElementById("chatBadge").textContent = u.badge;
+    document.getElementById("chatStatus").textContent = u.status;
+    document.getElementById("chatLegend").textContent = u.legend;
+    document.getElementById("chatInputLabel").textContent = u.input;
+    chatLog.setAttribute("aria-label", u.log);
+    chatReplies.setAttribute("aria-label", u.replies);
+    chatSend.setAttribute("aria-label", u.send);
+    chatInput.placeholder = chatLimitReached() ? u.limitPlaceholder : u.placeholder;
+    chatLangInputs.forEach(function (r) { r.checked = r.value === chatLang; });
+  }
+
+  function chatLockLimit() {
+    chatInput.disabled = true;
+    chatSend.disabled = true;
+    chatChips([]);
+    chatApplyLang();
+    chatNote(ui().limit);
+  }
+
+  function chatGreet() {
+    chatGreeted = true;
+    chatLog.innerHTML = "";
+    chatBubble("bot", CHAT_GREETING[chatLang]);
+    if (chatLimitReached()) chatLockLimit();
+    else chatChips(CHAT_CHIPS[chatLang]);
+  }
+
+  function setChatLang(next) {
+    chatLang = next;
+    chatApplyLang();
+    if (!chatStarted) chatGreet();
+    else if (!chatPending && !chatLimitReached()) chatChips(CHAT_CHIPS[next]);
+  }
+
+  /* The chat follows the site language until the visitor picks one in the chat */
+  function chatFollowSite(siteLang) {
+    if (chatLangPicked) return;
+    var next = LANGS.indexOf(siteLang) >= 0 ? siteLang : "en";
+    if (next !== chatLang) setChatLang(next);
+  }
+
+  /* Resolves to { reply, quickReplies } or null (no URL, error, bad JSON, timeout) */
+  function chatRequest(text) {
+    if (!CHAT_WEBHOOK_URL || typeof fetch !== "function") return sleep(900).then(function () { return null; });
+    var ctrl = typeof AbortController === "function" ? new AbortController() : null;
+    var timer;
+    var timeout = new Promise(function (resolve) {
+      timer = setTimeout(function () { if (ctrl) ctrl.abort(); resolve(null); }, CHAT_TIMEOUT_MS);
+    });
+    var req = fetch(CHAT_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId: chatSessionId(), message: text, lang: chatLang, channel: "web" }),
+      signal: ctrl ? ctrl.signal : undefined
+    }).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d || typeof d.reply !== "string" || !d.reply.trim()) return null;
+        var qr = Array.isArray(d.quickReplies) ? d.quickReplies.filter(function (q) {
+          return typeof q === "string" && q.trim();
+        }).slice(0, 4).map(function (q) { return q.trim().slice(0, 80); }) : [];
+        return { reply: d.reply.trim().slice(0, 2000), quickReplies: qr };
+      })
+      .catch(function () { return null; });
+    return Promise.race([req, timeout]).then(function (res) { clearTimeout(timer); return res; });
+  }
+
+  function chatSendMessage(raw) {
+    if (chatPending || chatLimitReached()) return;
+    var text = String(raw || "").trim().slice(0, CHAT_MAX_CHARS);
+    if (!text) return;
+    chatInput.value = "";
+    if (chatHp.value) return; // honeypot filled: a bot, drop silently
+    chatStarted = true;
+    chatBumpCount();
+    chatBubble("you", text);
+    chatChips([]);
+    chatSetPending(true);
+    var ty = typingEl();
+    ty.setAttribute("aria-hidden", "true");
+    chatLog.appendChild(ty);
+    chatScroll();
+    chatRequest(text).then(function (res) {
+      ty.remove();
+      if (res) {
+        chatBubble("bot", res.reply);
+        chatChips(res.quickReplies);
+      } else {
+        chatNote(ui().rest);
+      }
+      chatSetPending(false);
+      if (chatLimitReached()) chatLockLimit();
+    });
+  }
+
+  chatForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    chatSendMessage(chatInput.value);
+  });
+  chatLangInputs.forEach(function (r) {
+    r.addEventListener("change", function () {
+      if (!r.checked) return;
+      chatLangPicked = true;
+      setChatLang(r.value);
+    });
+  });
+
+  chatApplyLang();
+  (function () {
+    var ty = typingEl();
+    ty.setAttribute("aria-hidden", "true");
+    chatLog.appendChild(ty);
+    sleep(700).then(function () { if (!chatGreeted) chatGreet(); });
+  })();
+
+  /* ---------- Demo scenarios ---------- */
+  // Conversations use the fictional Lumière demo price list (salon-info.js).
+  var SCENARIOS = {
+    booking: {
+      chips: [{ k: "new", t: { en: "Tomorrow 10:00-11:00", fr: "Demain 10:00-11:00", es: "Mañana 10:00-11:00", ar: "غداً 10:00-11:00" }, l: { en: "Emma Clarke, women's haircut & styling", fr: "Emma Clarke, coupe femme & coiffage", es: "Emma Clarke, corte de mujer y peinado", ar: "إيما كلارك، قص وتصفيف شعر" } }],
+      lang: { en: "English", fr: "Anglais", es: "Inglés", ar: "الإنجليزية" },
+      log: { en: "Appointment added to the calendar: tomorrow 10:00-11:00 (60 min), for Emma Clarke.", fr: "Rendez-vous ajouté à l'agenda : demain 10:00-11:00 (60 min), au nom d'Emma Clarke.", es: "Cita añadida a la agenda: mañana de 10:00 a 11:00 (60 min), a nombre de Emma Clarke.", ar: "أضيف موعد إلى الأجندة: غداً 10:00-11:00 (60 دقيقة)، باسم إيما كلارك." },
+      msgs: [
+        { from: "client", text: "Hi! I'd like to book a haircut for tomorrow.", time: "21:12" },
+        { from: "bot", text: "Hi! 😊 A women's haircut & styling takes about an hour. Tomorrow I have 10:00 or 16:30 free. Which suits you best?", time: "21:12" },
+        { from: "client", text: "10am please", time: "21:13" },
+        { from: "bot", text: "Perfect. Could I have your first and last name for the booking?", time: "21:13" },
+        { from: "client", text: "Emma Clarke", time: "21:13" },
+        { from: "bot", text: "All booked ✅ Your haircut is tomorrow at 10:00, Emma. See you then!", time: "21:14" }
+      ]
+    },
+    reschedule: {
+      chips: [{ k: "removed", t: { en: "Thursday 11:00", fr: "Jeudi 11:00", es: "Jueves 11:00", ar: "الخميس 11:00" }, l: { en: "Time freed", fr: "Créneau libéré", es: "Hora liberada", ar: "وقت تحرّر" } }, { k: "new", t: { en: "Saturday 10:30", fr: "Samedi 10:30", es: "Sábado 10:30", ar: "السبت 10:30" }, l: { en: "Blow-dry moved", fr: "Brushing déplacé", es: "Secado cambiado", ar: "موعد التجفيف الجديد" } }],
+      lang: { en: "French", fr: "Français", es: "Francés", ar: "الفرنسية" },
+      log: { en: "Appointment moved in the calendar: from Thursday 11:00 to Saturday 10:30. Thursday's time is free again.", fr: "Rendez-vous déplacé dans l'agenda : de jeudi 11:00 à samedi 10:30. Le créneau de jeudi est de nouveau libre.", es: "Cita cambiada en la agenda: del jueves 11:00 al sábado 10:30. La hora del jueves vuelve a estar libre.", ar: "تم تغيير الموعد في الأجندة: من الخميس 11:00 إلى السبت 10:30. وقت الخميس أصبح شاغراً." },
+      msgs: [
+        { from: "client", text: "Bonsoir, je dois décaler mon brushing de jeudi 11h, j'ai un empêchement", time: "20:05" },
+        { from: "bot", text: "Bonsoir, pas de souci 😊 Je peux vous proposer vendredi à 14:00 ou samedi à 10:30.", time: "20:05" },
+        { from: "client", text: "Samedi 10h30 c'est parfait", time: "20:06" },
+        { from: "bot", text: "C'est fait ✅ Votre brushing est maintenant samedi à 10:30. À samedi !", time: "20:06" }
+      ]
+    },
+    cancel: {
+      chips: [{ k: "removed", t: { en: "Wednesday 15:00", fr: "Mercredi 15:00", es: "Miércoles 15:00", ar: "الأربعاء 15:00" }, l: { en: "Manicure cancelled, time available", fr: "Manucure annulée, créneau disponible", es: "Manicura cancelada, hora disponible", ar: "أُلغي المانيكير، الوقت متاح" } }],
+      lang: { en: "Arabic", fr: "Arabe", es: "Árabe", ar: "العربية" },
+      log: { en: "Wednesday 15:00 manicure removed from the calendar. The time is available again.", fr: "Manucure du mercredi 15:00 retirée de l'agenda. Le créneau est de nouveau disponible.", es: "Manicura del miércoles 15:00 eliminada de la agenda. La hora vuelve a estar disponible.", ar: "حُذف موعد المانيكير يوم الأربعاء 15:00 من الأجندة. الوقت أصبح متاحاً من جديد." },
+      msgs: [
+        { from: "client", text: "مرحباً، أريد إلغاء موعد المانيكير يوم الأربعاء", time: "18:22" },
+        { from: "bot", text: "أهلاً بك. موعدك يوم الأربعاء على الساعة 15:00 (مانيكير). هل تؤكد الإلغاء؟", time: "18:22" },
+        { from: "client", text: "نعم، من فضلك", time: "18:23" },
+        { from: "bot", text: "تم إلغاء الموعد ✅ يسعدنا استقبالك في أي وقت آخر.", time: "18:23" }
+      ]
+    },
+    voice: {
+      chips: [{ k: "new", t: { en: "Saturday 09:00-12:00", fr: "Samedi 09:00-12:00", es: "Sábado 09:00-12:00", ar: "السبت 09:00-12:00" }, l: { en: "Marta Ruiz, balayage (180 min)", fr: "Marta Ruiz, balayage (180 min)", es: "Marta Ruiz, balayage (180 min)", ar: "مارتا رويز، بالياج (180 دقيقة)" } }],
+      lang: { en: "Spanish, voice message", fr: "Espagnol, message vocal", es: "Español, nota de voz", ar: "الإسبانية، رسالة صوتية" },
+      transcript: { en: "What the client said", fr: "Ce que la cliente a dit", es: "Lo que dijo la clienta", ar: "ما قالته العميلة", text: "Hola, quería pedir cita para un balayage el sábado por la mañana, a nombre de Marta Ruiz." },
+      log: { en: "Voice message understood. Balayage booked for Saturday 09:00-12:00, the full 3 hours.", fr: "Message vocal compris. Balayage réservé samedi 09:00-12:00, pour toute la durée de 3 heures.", es: "Nota de voz entendida. Balayage reservado el sábado de 09:00 a 12:00, las 3 horas completas.", ar: "فُهمت الرسالة الصوتية. حُجز البالياج يوم السبت 09:00-12:00، لكامل المدة (3 ساعات)." },
+      msgs: [
+        { from: "client", voice: "0:09", time: "22:51" },
+        { from: "bot", text: "¡Claro, Marta! El balayage dura unas 3 horas. El sábado puedo ofrecerte las 09:00 o las 09:30. ¿Cuál prefieres?", time: "22:51" },
+        { from: "client", text: "A las 9", time: "22:52" },
+        { from: "bot", text: "¡Reservado! ✅ Balayage el sábado a las 09:00, Marta. ¡Te esperamos!", time: "22:52" }
+      ]
+    },
+    info: {
+      chips: [],
+      lang: { en: "Spanish", fr: "Espagnol", es: "Español", ar: "الإسبانية" },
+      log: { en: "Answered with the salon's price list and opening hours. No action needed from the team.", fr: "Réponse donnée avec la grille tarifaire et les horaires du salon. Aucune intervention de l'équipe.", es: "Respondido con la lista de precios y el horario del salón. Sin intervención del equipo.", ar: "تم الرد بقائمة أسعار الصالون وأوقات عمله. دون أي تدخل من الفريق." },
+      msgs: [
+        { from: "client", text: "hola! cuanto cuesta el balayage y abris los sabados?", time: "13:02" },
+        { from: "bot", text: "¡Hola! 😊 El balayage cuesta desde 140 € y dura unas 3 horas (el precio final depende del largo del pelo). Abrimos de lunes a sábado, de 9:00 a 19:00. ¿Quieres que te busque una cita?", time: "13:02" },
+        { from: "client", text: "genial, gracias 🙏", time: "13:03" },
+        { from: "bot", text: "¡A ti! Cuando quieras, te reservo una hora.", time: "13:03" }
+      ]
+    },
+    urgent: {
+      chips: [{ k: "alert", t: { en: "Salon team", fr: "Équipe du salon", es: "Equipo del salón", ar: "فريق الصالون" }, l: { en: "Alerted on WhatsApp", fr: "Prévenue sur WhatsApp", es: "Avisado por WhatsApp", ar: "تم التنبيه عبر واتساب" } }],
+      lang: { en: "English", fr: "Anglais", es: "Inglés", ar: "الإنجليزية" },
+      log: { en: "Conversation handed over to the salon team, who were alerted on WhatsApp. Yasmine never gives medical or skin-care advice.", fr: "Conversation transmise à l'équipe du salon, prévenue sur WhatsApp. Yasmine ne donne jamais d'avis médical ou dermatologique.", es: "Conversación pasada al equipo del salón, avisado por WhatsApp. Yasmine nunca da consejos médicos ni sobre la piel.", ar: "حُوّلت المحادثة إلى فريق الصالون الذي تم تنبيهه عبر واتساب. ياسمين لا تعطي أي نصيحة طبية أو تتعلق بالبشرة." },
+      msgs: [
+        { from: "client", text: "My scalp has been itchy and red since my colour yesterday. What should I put on it?", time: "02:14" },
+        { from: "bot", text: "I'm sorry to hear that 🙏 I can't give medical advice, so I've passed your message to the salon team and a team member will follow up with you personally. If it gets worse, or you notice swelling or trouble breathing, please seek medical help right away.", time: "02:14" },
+        { from: "system", en: "Conversation handed over to the salon team", fr: "Conversation transmise à l'équipe du salon", es: "Conversación pasada al equipo del salón", ar: "حُوّلت المحادثة إلى فريق الصالون" }
+      ]
+    }
+  };
+
+  var demoChat = document.getElementById("demoChat");
+  var panelLang = document.getElementById("panelLang");
+  var panelLog = document.getElementById("panelLog");
+  var panelStatus = document.getElementById("panelStatus");
+  var panelTranscript = document.getElementById("panelTranscript");
+  var panelChips = document.getElementById("panelChips");
+
+  function renderChips(s, done) {
+    panelChips.innerHTML = "";
+    if (!done) { panelChips.innerHTML = '<span class="chip-none">–</span>'; return; }
+    if (!s.chips.length) {
+      var n = document.createElement("span");
+      n.className = "chip-none";
+      n.textContent = t("panel.none");
+      panelChips.appendChild(n);
+      return;
+    }
+    var wrap = document.createElement("div");
+    wrap.className = "chips";
+    s.chips.forEach(function (c, i) {
+      var el = document.createElement("span");
+      el.className = "chip " + c.k;
+      el.style.animationDelay = (i * 0.12) + "s";
+      var b = document.createElement("b"); b.textContent = c.t[lang];
+      var sm = document.createElement("small"); sm.textContent = c.l[lang];
+      el.appendChild(b); el.appendChild(sm);
+      wrap.appendChild(el);
+    });
+    panelChips.appendChild(wrap);
+  }
+  var currentScenario = null;
+  var panelDone = false;
+
+  function renderPanel(key, done) {
+    var s = SCENARIOS[key];
+    panelLang.textContent = s.lang[lang];
+    renderChips(s, done);
+    panelStatus.classList.toggle("done", done);
+    panelLog.removeAttribute("data-i18n");
+    panelLog.textContent = done ? s.log[lang] : t("panel.waiting");
+    if (s.transcript && done) {
+      panelTranscript.hidden = false;
+      panelTranscript.innerHTML = "";
+      var lab = document.createElement("small"); lab.textContent = s.transcript[lang];
+      var q = document.createElement("div"); q.dir = "auto"; q.textContent = s.transcript.text;
+      panelTranscript.appendChild(lab); panelTranscript.appendChild(q);
+    } else {
+      panelTranscript.hidden = true;
+    }
+  }
+
+  function playScenario(key) {
+    currentScenario = key;
+    panelDone = false;
+    renderPanel(key, false);
+    play(demoChat, SCENARIOS[key].msgs).then(function (ok) {
+      if (ok && currentScenario === key) { panelDone = true; renderPanel(key, true); }
+    });
+  }
+
+  var tabs = Array.prototype.slice.call(document.querySelectorAll(".tab"));
+  tabs.forEach(function (tab, idx) {
+    tab.addEventListener("click", function () {
+      tabs.forEach(function (x) { x.setAttribute("aria-selected", x === tab ? "true" : "false"); x.tabIndex = x === tab ? 0 : -1; });
+      playScenario(tab.getAttribute("data-scenario"));
+    });
+    tab.addEventListener("keydown", function (e) {
+      var dir = document.documentElement.dir === "rtl" ? -1 : 1;
+      var n = null;
+      if (e.key === "ArrowRight") n = idx + dir;
+      if (e.key === "ArrowLeft") n = idx - dir;
+      if (n === null) return;
+      e.preventDefault();
+      var next = tabs[(n + tabs.length) % tabs.length];
+      next.focus();
+      next.click();
+    });
+    tab.tabIndex = idx === 0 ? 0 : -1;
+  });
+
+  /* Start animations when they come into view */
+  function onVisible(el, fn) {
+    if (!("IntersectionObserver" in window)) { fn(); return; }
+    var io = new IntersectionObserver(function (entries) {
+      if (entries[0].isIntersecting) { io.disconnect(); fn(); }
+    }, { threshold: 0.35 });
+    io.observe(el);
+  }
+  onVisible(demoChat, function () { if (!currentScenario) playScenario("booking"); });
+
+  /* ---------- Calculator ---------- */
+  var cMsgs = document.getElementById("cMsgs");
+  var cBook = document.getElementById("cBook");
+  var cLost = document.getElementById("cLost");
+  var cPrice = document.getElementById("cPrice");
+
+  var NUM_LOCALE = { en: "en-GB", fr: "fr-FR", es: "es-ES", ar: "fr-FR" };
+  function fmt(n) { return Math.round(n).toLocaleString(NUM_LOCALE[lang] || "en-GB").replace(/\u202f|\u00a0/g, " "); }
+
+  function setFill(el) {
+    var pct = (el.value - el.min) / (el.max - el.min) * 100;
+    el.style.setProperty("--fill", pct + "%");
+  }
+  function updateCalc() {
+    [cMsgs, cBook, cLost].forEach(setFill);
+    var msgs = +cMsgs.value, book = +cBook.value, lost = +cLost.value;
+    var price = Math.max(0, +cPrice.value || 0);
+    var perMonth = msgs * (52 / 12) * (book / 100) * (lost / 100);
+    document.getElementById("oMsgs").textContent = msgs;
+    document.getElementById("oBook").textContent = book + " %";
+    document.getElementById("oLost").textContent = lost + " %";
+    var count = Math.round(perMonth);
+    document.getElementById("rCount").textContent = fmt(count);
+    document.getElementById("rMoney").textContent = fmt(count * price) + " " + CURRENCY;
+    document.getElementById("cCurrency").textContent = CURRENCY;
+  }
+  [cMsgs, cBook, cLost, cPrice].forEach(function (el) { el.addEventListener("input", updateCalc); });
+  updateCalc();
+
+  /* ---------- Header + floating button ---------- */
+  var header = document.querySelector(".site-header");
+  var hero = document.querySelector(".hero");
+  var waFloat = document.getElementById("waFloat");
+  function onScroll() {
+    var y = window.scrollY;
+    header.classList.toggle("scrolled", y > 40);
+    waFloat.classList.toggle("show", y > hero.offsetHeight * 0.8);
+  }
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+
+  /* ---------- Language ---------- */
+  document.getElementById("langSelect").addEventListener("change", function (e) { setLang(e.target.value); });
+  var saved = null;
+  try { saved = localStorage.getItem("lumiere-lang"); } catch (e) {}
+  if (saved && saved !== "en" && LANGS.indexOf(saved) >= 0) setLang(saved);
+  else updateWaLinks();
+})();
+
+</script>
+</body>
+</html>

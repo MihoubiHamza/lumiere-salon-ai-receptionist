@@ -1,0 +1,11 @@
+{
+  "name": "lumiere-salon-workflow-tests",
+  "private": true,
+  "description": "Executable tests for the n8n workflow JSON files in the parent folder.",
+  "scripts": {
+    "test": "node run-all.js"
+  },
+  "devDependencies": {
+    "luxon": "^3.5.0"
+  }
+}

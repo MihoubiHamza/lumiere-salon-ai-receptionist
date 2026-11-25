@@ -1,0 +1,32 @@
+Field,Value
+Salon name,Lumière Hair & Beauty Studio
+Salon name (Arabic),استوديو لوميير للشعر والتجميل
+Description,"a modern, welcoming hair and beauty salon"
+Demo data,All values in this sheet are fictional demo values
+Address,"12 Avenue de la Lumière, Demo City (fictional demo address)"
+Phone,+00 000 000 000 (fictional demo number)
+Email,hello@lumiere-salon.example (fictional demo address)
+Opening days,Monday to Saturday
+Weekly closing day,Sunday
+Opening hours,09:00 - 19:00 (appointments must end by 19:00)
+Currency,EUR
+Service: Women's haircut & styling,60 min - from €45 | FR: Coupe femme & coiffage | ES: Corte de mujer y peinado | AR: قص وتصفيف شعر للنساء
+Service: Men's haircut,30 min - €25 | FR: Coupe homme | ES: Corte de caballero | AR: قص شعر للرجال
+Service: Blow-dry & styling,30 min - from €30 | FR: Brushing | ES: Secado y peinado (brushing) | AR: تجفيف وتصفيف (براشينغ)
+Service: Nourishing hair treatment (mask + blow-dry),45 min - €40 | FR: Soin nourrissant (masque + brushing) | ES: Tratamiento nutritivo (mascarilla + secado) | AR: علاج مغذٍّ للشعر (ماسك + تجفيف)
+Service: Keratin smoothing treatment,150 min - from €120 | FR: Lissage à la kératine | ES: Alisado de keratina | AR: علاج تنعيم بالكيراتين
+Service: Root colour touch-up,90 min - €50 | FR: Coloration racines | ES: Tinte de raíces | AR: صبغة الجذور
+Service: Full hair colour,120 min - from €70 | FR: Coloration complète | ES: Tinte completo | AR: صبغة كاملة للشعر
+Service: Balayage,180 min - from €140 | FR: Balayage | ES: Balayage | AR: بالياج
+Service: Manicure,45 min - €25 | FR: Manucure | ES: Manicura | AR: مانيكير
+Service: Gel manicure,60 min - €35 | FR: Manucure semi-permanente | ES: Manicura semipermanente | AR: مانيكير جل
+Service: Pedicure,60 min - €35 | FR: Pédicure | ES: Pedicura | AR: باديكير
+Service: Classic facial,60 min - €55 | FR: Soin du visage classique | ES: Limpieza facial clásica | AR: عناية كلاسيكية بالوجه
+Service: Eyebrow shaping,30 min - €15 | FR: Restructuration des sourcils | ES: Diseño de cejas | AR: تشكيل الحواجب
+Policy 1,Booking: appointments are recommended. Walk-ins are welcome only when a slot is free.
+Policy 2,"Changes and cancellations: please let the salon know at least 24 hours in advance, so the time can be offered to another customer. No cancellation fee is mentioned in this demo - never invent one."
+Policy 3,"Late arrival: if a customer arrives more than 15 minutes late, the service may need to be shortened or moved to another time."
+Policy 4,"Colour services: for a first colour with the salon, a quick skin (patch) test at least 48 hours before is recommended - the customer can mention it and the team will arrange it at the salon."
+Policy 5,"Prices marked ""from"" depend on hair length and products; the final price is confirmed at the salon before the service starts."
+Policy 6,Payment: card or cash at the salon. No online payment.
+Policy 7,Several services in one visit (e.g. cut + colour) are booked as one appointment whose length is the sum of the service durations (maximum 4 hours).

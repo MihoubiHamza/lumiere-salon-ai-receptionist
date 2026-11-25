@@ -1,0 +1,1754 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lumière Hair &amp; Beauty Studio · Demo salon with Yasmine, the AI receptionist</title>
+<meta name="description" content="Lumière Hair &amp; Beauty Studio is a fictional demo salon. Ask Yasmine, its AI receptionist, about services and prices, or book, move and cancel an appointment in English, French, Spanish or Arabic.">
+<meta property="og:title" content="Lumière Hair &amp; Beauty Studio · Demo salon">
+<meta property="og:description" content="Hair, colour and care, by appointment. Yasmine, the AI receptionist, answers and books in four languages.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#F4EFE8">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' fill='%232B2420'/><text x='32' y='46' text-anchor='middle' font-family='Georgia,serif' font-size='40' font-style='italic' fill='%23F4EFE8'>L</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://images.unsplash.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&amp;family=DM+Mono:wght@400&amp;family=IBM+Plex+Sans+Arabic:wght@300;400;500&amp;family=Instrument+Sans:wght@400;500;600&amp;family=Noto+Naskh+Arabic:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+:root {
+  --bone: #F4EFE8;
+  --card: #FBF8F3;
+  --linen: #E9E1D6;
+  --sand: #CDBFAE;
+  --taupe: #8E7F72;
+  --ink: #2B2420;
+  --ink-2: #5F544C;
+  --line: #D9CFC3;
+  --clay: #B07A6A;
+  --clay-ink: #8C5A4B;
+  --serif: "Cormorant Garamond", "Noto Naskh Arabic", Georgia, "Times New Roman", serif;
+  --sans: "Instrument Sans", "IBM Plex Sans Arabic", "Segoe UI", system-ui, sans-serif;
+  --mono: "DM Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --wa-dark: #075e54; --wa: #00a884; --wa-bubble: #d9fdd3; --wa-bg: #efeae2;
+  --header-h: 64px;
+  --gutter: 32px; /* page side margin; full-bleed photos pull out by exactly this */
+}
+html[lang="ar"] {
+  --serif: "Noto Naskh Arabic", "Cormorant Garamond", serif;
+  --sans: "IBM Plex Sans Arabic", "Instrument Sans", system-ui, sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; padding: 0; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; scroll-padding-top: calc(var(--header-h) + 8px); }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation: none !important; transition: none !important; } }
+body { font-family: var(--sans); color: var(--ink); background: var(--bone); font-size: 16.5px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+html[lang="ar"] body { font-size: 17px; line-height: 1.85; }
+img { display: block; max-width: 100%; }
+svg { display: block; }
+a { color: inherit; }
+button { font: inherit; color: inherit; cursor: pointer; background: none; border: 0; }
+:focus-visible { outline: 2px solid var(--clay-ink); outline-offset: 3px; }
+.wrap { width: 100%; max-width: 1240px; margin-inline: auto; padding-inline: var(--gutter); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+bdi.nm { white-space: nowrap; unicode-bidi: isolate; }
+
+/* ---------- Type ---------- */
+h1, h2 { font-family: var(--serif); font-weight: 300; letter-spacing: -.01em; line-height: 1.02; }
+h1 { font-size: clamp(46px, 5.6vw, 86px); }
+h2 { font-size: clamp(40px, 4.4vw, 66px); }
+h1 em, h2 em { font-style: italic; color: var(--clay-ink); }
+/* Clean breaks in every language: balanced headings, no one-word last lines in running text */
+h1, h2, h3 { text-wrap: balance; }
+p, li, dd { text-wrap: pretty; }
+/* One rhythm between a section label and its heading (was set inline, and missing in Services) */
+.label + h2 { margin-top: 22px; }
+html[lang="ar"] h1, html[lang="ar"] h2 { font-weight: 500; line-height: 1.35; letter-spacing: 0; }
+html[lang="ar"] h1 { font-size: clamp(36px, 4.2vw, 62px); }
+html[lang="ar"] h2 { font-size: clamp(32px, 3.4vw, 50px); }
+html[lang="ar"] h1 em, html[lang="ar"] h2 em { font-style: normal; }
+.label { font-family: var(--sans); font-size: 12px; font-weight: 500; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-2); }
+html[lang="ar"] .label { letter-spacing: 0; text-transform: none; font-size: 14px; }
+.lede { font-size: 17px; color: var(--ink-2); max-width: 34em; }
+.mono { font-family: var(--mono); font-size: 13.5px; letter-spacing: .02em; }
+
+/* ---------- Buttons (square, no pills) ---------- */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 48px; padding: 14px 24px; border-radius: 2px; border: 1px solid var(--ink); font-family: var(--sans); font-size: 12px; font-weight: 600; line-height: 1.3; letter-spacing: .14em; text-transform: uppercase; text-align: center; text-wrap: balance; text-decoration: none; transition: background-color .2s, color .2s, border-color .2s; }
+/* Long French/Spanish labels may wrap inside a button; the header button never does */
+.bar .btn { white-space: nowrap; }
+html[lang="ar"] .btn { letter-spacing: 0; text-transform: none; font-size: 15px; font-weight: 500; line-height: 1.35; }
+.btn-solid { background: var(--ink); color: var(--bone); }
+.btn-solid:hover { background: transparent; color: var(--ink); }
+.btn-line { background: transparent; color: var(--ink); }
+.btn-line:hover { background: var(--ink); color: var(--bone); }
+.btn-light { background: var(--bone); color: var(--ink); border-color: var(--bone); }
+.btn-light:hover { background: transparent; color: var(--bone); }
+.btn-line-light { background: transparent; color: var(--bone); border-color: rgba(244,239,232,.6); }
+.btn-line-light:hover { background: var(--bone); color: var(--ink); border-color: var(--bone); }
+.btn-sm { min-height: 40px; padding: 10px 18px; }
+
+/* ---------- Header ---------- */
+.site-header { position: sticky; top: 0; z-index: 40; background: rgba(244,239,232,.94); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1px solid transparent; transition: border-color .2s; }
+.site-header.scrolled { border-bottom-color: var(--line); }
+.bar { height: var(--header-h); display: flex; align-items: center; gap: 28px; }
+.wordmark { display: inline-flex; align-items: baseline; gap: 12px; text-decoration: none; flex: none; }
+.wm-name { font-family: "Cormorant Garamond", Georgia, serif; font-size: 30px; font-weight: 400; line-height: 1; letter-spacing: .01em; }
+.wm-sub { font-size: 10.5px; letter-spacing: .2em; }
+html[lang="ar"] .wm-sub { font-size: 12px; letter-spacing: 0; }
+.main-nav { display: flex; gap: 26px; margin-inline-start: auto; }
+.main-nav a { font-size: 14px; text-decoration: none; color: var(--ink-2); padding-block: 6px; border-bottom: 1px solid transparent; white-space: nowrap; }
+.main-nav a:hover { color: var(--ink); border-bottom-color: var(--ink); }
+.bar-end { display: flex; align-items: center; gap: 18px; }
+.langs { display: flex; align-items: center; gap: 2px; font-family: var(--mono); font-size: 12.5px; color: var(--taupe); }
+.lang-btn { padding: 8px 5px; min-width: 30px; color: var(--ink-2); font-family: var(--mono); font-size: 12.5px; letter-spacing: .06em; border-bottom: 1px solid transparent; }
+.lang-btn[lang="ar"] { font-family: "IBM Plex Sans Arabic", sans-serif; font-size: 15px; line-height: 1; }
+.lang-btn[aria-pressed="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+.lang-btn:hover { color: var(--ink); }
+.menu-btn { display: none; width: 44px; height: 44px; flex-direction: column; align-items: center; justify-content: center; gap: 6px; margin-inline-end: -10px; }
+.menu-btn i { display: block; width: 22px; height: 1px; background: var(--ink); }
+
+/* Full-screen mobile menu */
+.mobile-menu { position: fixed; inset: 0; z-index: 60; background: var(--bone); display: flex; flex-direction: column; padding: 0 24px 32px; overflow-y: auto; }
+.mobile-menu[hidden] { display: none; }
+.mm-top { height: var(--header-h); display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
+.mm-close { width: 44px; height: 44px; display: grid; place-items: center; margin-inline-end: -10px; }
+.mm-close svg { width: 22px; height: 22px; }
+.mm-nav { display: flex; flex-direction: column; padding-block: 20px; counter-reset: mm; }
+.mm-nav a { counter-increment: mm; display: flex; align-items: baseline; gap: 16px; padding-block: 16px; border-bottom: 1px solid var(--line); font-family: var(--serif); font-size: 34px; font-weight: 300; line-height: 1.1; text-decoration: none; }
+.mm-nav a::before { content: "0" counter(mm); font-family: var(--mono); font-size: 12px; color: var(--taupe); }
+html[lang="ar"] .mm-nav a { font-size: 26px; font-weight: 500; }
+.mobile-menu .langs { padding-block: 8px 24px; font-size: 15px; }
+.mobile-menu .lang-btn { font-size: 15px; padding: 10px 8px; }
+.mobile-menu .btn { width: 100%; }
+
+/* ---------- Hero ---------- */
+.hero { padding-block: 40px 0; }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .66fr) 420px; grid-template-areas: "head photo chat" "body photo chat"; grid-template-rows: auto 1fr; column-gap: 40px; row-gap: 28px; align-items: start; }
+.hero-head { grid-area: head; padding-top: 28px; }
+.hero-head .label { margin-bottom: 24px; }
+.hero-body { grid-area: body; align-self: end; }
+.hero-body .frame { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 15px; color: var(--ink-2); max-width: 30em; }
+.hero-body .frame a { color: var(--clay-ink); text-underline-offset: 3px; }
+.hero-photo { grid-area: photo; height: 100%; min-height: 560px; overflow: hidden; background: var(--linen); }
+.hero-photo img, .ph img { width: 100%; height: 100%; object-fit: cover; }
+.hero-chat { grid-area: chat; }
+
+/* Concierge chat */
+.live-chat { background: var(--card); border: 1px solid var(--line); display: flex; flex-direction: column; height: 600px; }
+.lc-head { padding: 18px 20px 14px; border-bottom: 1px solid var(--line); display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.lc-title { display: block; font-family: var(--serif); font-size: 22px; font-weight: 400; line-height: 1.15; }
+html[lang="ar"] .lc-title, .live-chat[lang="ar"] .lc-title { font-family: "Noto Naskh Arabic", serif; font-size: 19px; font-weight: 500; }
+.lc-sub { display: flex; align-items: flex-start; gap: 7px; margin-top: 4px; font-size: 12.5px; line-height: 1.5; color: var(--ink-2); }
+.lc-sub i { width: 6px; height: 6px; background: #6E8B6A; flex: none; margin-top: 6.5px; } /* stays on the first line when the status wraps */
+.lc-langs { border: 0; display: flex; gap: 2px; flex: none; }
+.lc-langs label { position: relative; cursor: pointer; }
+.lc-langs input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+.lc-langs span { display: block; padding: 4px 5px; font-family: var(--mono); font-size: 11.5px; color: var(--taupe); border-bottom: 1px solid transparent; letter-spacing: .05em; }
+.lc-langs span[lang="ar"] { font-family: "IBM Plex Sans Arabic", sans-serif; font-size: 14px; line-height: 1.1; }
+.lc-langs input:checked + span { color: var(--ink); border-bottom-color: var(--ink); }
+.lc-langs input:focus-visible + span { outline: 2px solid var(--clay-ink); outline-offset: 2px; }
+.lc-log { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 20px 8px; display: flex; flex-direction: column; gap: 12px; scroll-behavior: smooth; }
+.lc-log .msg { max-width: 88%; font-size: 15px; line-height: 1.55; }
+.lc-log .msg time { display: block; margin-top: 3px; font-family: var(--mono); font-size: 10.5px; color: var(--taupe); }
+.lc-log .msg.bot { align-self: flex-start; background: var(--linen); padding: 11px 14px; }
+.lc-log .msg.client { align-self: flex-end; background: var(--ink); color: var(--bone); padding: 10px 14px; }
+.lc-log .msg.client time { color: rgba(244,239,232,.6); text-align: end; }
+.lc-text { white-space: pre-line; overflow-wrap: anywhere; }
+.lc-log .typing { align-self: flex-start; background: var(--linen); padding: 13px 14px; display: flex; gap: 5px; }
+.lc-log .typing i { width: 5px; height: 5px; background: var(--taupe); animation: blink 1s infinite; }
+.lc-note { align-self: stretch; border: 1px solid var(--line); background: var(--bone); padding: 14px; font-size: 14px; color: var(--ink-2); }
+.lc-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.lc-actions a { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; text-decoration: none; padding: 9px 12px; border: 1px solid var(--ink); }
+.live-chat[lang="ar"] .lc-actions a { letter-spacing: 0; text-transform: none; font-size: 13px; }
+.lc-actions a:first-child { background: var(--ink); color: var(--bone); }
+.lc-replies { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 20px 12px; }
+.lc-replies:empty { display: none; }
+.lc-chip { border: 1px solid var(--sand); background: transparent; padding: 7px 11px; font-size: 13px; line-height: 1.35; text-align: start; border-radius: 0; color: var(--ink); transition: border-color .15s, background-color .15s; }
+.lc-chip:hover:not(:disabled) { border-color: var(--ink); background: var(--bone); }
+.lc-chip:disabled { opacity: .45; cursor: default; }
+.lc-form { display: flex; border-top: 1px solid var(--line); }
+.lc-form input[type="text"] { flex: 1; min-width: 0; border: 0; background: transparent; padding: 16px 20px; font: inherit; font-size: 16px; color: var(--ink); text-overflow: ellipsis; }
+.lc-form input[type="text"]:focus { outline: none; }
+.lc-form:focus-within { box-shadow: inset 0 0 0 1px var(--ink); }
+.lc-form input::placeholder { color: var(--taupe); }
+.lc-send { width: 56px; flex: none; display: grid; place-items: center; background: var(--ink); color: var(--bone); }
+.lc-send svg { width: 18px; height: 18px; }
+.live-chat[dir="rtl"] .lc-send svg { transform: scaleX(-1); }
+.lc-send:disabled { background: var(--sand); cursor: default; }
+.lc-form { position: relative; }
+.lc-hp { position: absolute; top: 0; inset-inline-start: 0; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); opacity: 0; pointer-events: none; }
+.lc-demo { padding: 9px 20px 11px; border-top: 1px solid var(--line); font-size: 12px; line-height: 1.45; color: var(--ink-2); }
+
+/* Info strip */
+.strip { list-style: none; display: flex; flex-wrap: wrap; gap: 10px 0; margin-top: 44px; padding-block: 18px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-family: var(--mono); font-size: 13px; color: var(--ink-2); letter-spacing: .02em; }
+.strip li { display: block; }
+.strip li + li::before { content: ""; display: inline-block; vertical-align: middle; width: 4px; height: 4px; background: var(--sand); margin-inline: 18px; position: relative; top: -1px; }
+html[lang="ar"] .strip { font-family: var(--sans); font-size: 14px; letter-spacing: 0; }
+
+/* ---------- Sections ---------- */
+.section { padding-block: 120px; }
+.kicker-row { display: flex; align-items: baseline; gap: 14px; margin-bottom: 22px; }
+.kicker-row .num { font-family: var(--mono); font-size: 12px; color: var(--taupe); }
+.section-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; align-items: end; margin-bottom: 56px; }
+.section-head .lede { justify-self: end; }
+
+/* Services menu */
+.svc-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 80px; align-items: start; }
+.svc-intro { position: sticky; top: calc(var(--header-h) + 32px); }
+.svc-intro h2 { margin-bottom: 24px; }
+.svc-intro .btn { margin-top: 28px; }
+.mosaic { display: grid; grid-template-columns: 1.15fr .85fr; gap: 12px; margin-top: 44px; align-items: end; }
+.ph { overflow: hidden; background: var(--linen); }
+.mosaic .ph:first-child { aspect-ratio: 4 / 5; }
+.mosaic .ph:last-child { aspect-ratio: 3 / 4; }
+.menu { counter-reset: cat; }
+.cat { padding-bottom: 40px; }
+.cat + .cat { padding-top: 8px; }
+.cat-head { display: flex; align-items: baseline; gap: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--ink); }
+.cat-head .num { font-family: var(--mono); font-size: 12px; color: var(--taupe); }
+.cat-head h3 { font-family: var(--serif); font-size: 32px; font-weight: 400; line-height: 1.1; }
+html[lang="ar"] .cat-head h3 { font-size: 26px; font-weight: 500; }
+.svc { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 24px; align-items: baseline; padding-block: 15px; border-bottom: 1px solid var(--line); }
+.svc-name { font-size: 16.5px; }
+.svc-dur { font-family: var(--mono); font-size: 12.5px; color: var(--taupe); white-space: nowrap; }
+.svc-price { font-family: var(--mono); font-size: 14px; white-space: nowrap; min-width: 6.5em; text-align: end; }
+.svc-price small { font-size: 11px; color: var(--ink-2); margin-inline-end: 4px; text-transform: uppercase; letter-spacing: .08em; }
+html[lang="ar"] .svc-price small { text-transform: none; letter-spacing: 0; font-family: var(--sans); font-size: 13px; }
+
+/* Try the receptionist */
+.try { background: var(--linen); }
+.tabs { display: flex; gap: 28px; border-bottom: 1px solid var(--sand); margin-bottom: 44px; overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { flex: none; padding: 12px 0; font-size: 15px; color: var(--ink-2); border-bottom: 1px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.tab:hover { color: var(--ink); }
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+.demo-grid { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 56px; align-items: stretch; }
+.phone { background: var(--ink); border-radius: 40px; padding: 10px; width: 100%; max-width: 360px; }
+.phone-screen { border-radius: 31px; overflow: hidden; background: var(--wa-bg); display: flex; flex-direction: column; height: 540px; }
+.wa-bar { background: var(--wa-dark); color: #fff; display: flex; align-items: center; gap: 10px; padding: 16px 16px 12px; }
+.wa-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--bone); color: var(--ink); display: grid; place-items: center; font-family: "Cormorant Garamond", serif; font-size: 20px; font-style: italic; flex: none; }
+.wa-bar strong { display: block; font-size: .95rem; font-weight: 500; line-height: 1.2; }
+.wa-bar span { font-size: .78rem; opacity: .8; }
+.chat { flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; padding: 14px 12px 16px; font-family: "Segoe UI", Roboto, "IBM Plex Sans Arabic", system-ui, sans-serif;
+  /* older messages fade out under the header instead of being cut through */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 44px); mask-image: linear-gradient(to bottom, transparent 0, #000 44px); }
+.msg { max-width: 84%; padding: 6px 9px 4px; border-radius: 8px; font-size: .9rem; line-height: 1.4; box-shadow: 0 1px .5px rgba(11,20,26,.13); }
+.chat .msg time { display: block; font-size: .66rem; color: #667781; text-align: end; margin-top: 1px; }
+.chat .msg.client { align-self: flex-end; background: var(--wa-bubble); border-start-end-radius: 2px; }
+.chat .msg.bot { align-self: flex-start; background: #fff; border-start-start-radius: 2px; }
+.chat .msg.system { align-self: center; background: #fff5c4; color: #54656f; font-size: .76rem; text-align: center; box-shadow: none; }
+.voice { display: flex; align-items: center; gap: 9px; min-width: 190px; padding-block: 3px; }
+.voice-play { width: 30px; height: 30px; border-radius: 50%; background: #3b4a54; color: #fff; display: grid; place-items: center; flex: none; }
+.voice-play svg { width: 12px; height: 12px; }
+.wave { display: flex; align-items: center; gap: 2px; height: 26px; flex: 1; }
+.wave i { display: block; width: 3px; border-radius: 2px; background: #8696a0; }
+.voice-len { font-size: .72rem; color: #667781; }
+.chat .typing { align-self: flex-start; background: #fff; border-radius: 8px; border-start-start-radius: 2px; padding: 11px 14px; display: flex; gap: 4px; }
+.chat .typing i { width: 7px; height: 7px; border-radius: 50%; background: #8696a0; animation: blink 1s infinite; }
+.typing i:nth-child(2) { animation-delay: .15s; }
+.typing i:nth-child(3) { animation-delay: .3s; }
+@keyframes blink { 0%, 100% { opacity: .3; } 50% { opacity: 1; } }
+.wa-input { display: flex; align-items: center; gap: 8px; padding: 8px 10px 14px; }
+.wa-input div { flex: 1; height: 38px; border-radius: 999px; background: #fff; }
+.wa-input span { width: 38px; height: 38px; border-radius: 50%; background: var(--wa); flex: none; }
+
+.salon-panel { background: var(--card); border: 1px solid var(--line); padding: 32px 36px; display: flex; flex-direction: column; }
+.salon-panel h3 { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; font-family: var(--serif); font-size: 34px; font-weight: 400; line-height: 1.1; padding-bottom: 18px; border-bottom: 1px solid var(--ink); }
+html[lang="ar"] .salon-panel h3 { font-size: 28px; font-weight: 500; }
+.salon-panel h3 small { font-family: var(--mono); font-size: 11.5px; color: var(--taupe); letter-spacing: .08em; text-transform: uppercase; font-weight: 400; }
+.panel-row { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 24px; padding-block: 20px; border-bottom: 1px solid var(--line); }
+.panel-row dt { font-size: 12px; font-weight: 500; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); padding-top: 3px; }
+html[lang="ar"] .panel-row dt { letter-spacing: 0; text-transform: none; font-size: 14px; }
+.panel-row dd { font-size: 16.5px; line-height: 1.55; }
+.panel-status { display: flex; align-items: flex-start; gap: 12px; }
+.panel-status .icon { width: 24px; height: 24px; display: grid; place-items: center; flex: none; margin-top: 2px; border: 1px solid var(--sand); }
+.panel-status.done .icon { background: var(--ink); border-color: var(--ink); color: var(--bone); }
+.panel-status .icon .i-done { display: none; width: 13px; height: 13px; }
+.panel-status.done .icon .i-done { display: block; }
+.panel-status.done .icon .i-wait { display: none; }
+.i-wait { display: flex; gap: 2px; }
+.i-wait i { width: 3px; height: 3px; background: var(--taupe); animation: blink 1s infinite; }
+.i-wait i:nth-child(2) { animation-delay: .15s; } .i-wait i:nth-child(3) { animation-delay: .3s; }
+.chips { display: flex; flex-wrap: wrap; gap: 10px; }
+.chip { display: inline-flex; flex-direction: column; gap: 2px; padding: 10px 14px; border: 1px solid var(--line); background: var(--bone); animation: pop .3s ease-out both; }
+.chip b { font-family: var(--mono); font-weight: 400; font-size: 14px; }
+.chip small { font-size: 13px; color: var(--ink-2); }
+.chip.new { border-color: var(--clay); border-inline-start: 3px solid var(--clay); }
+.chip.removed b { text-decoration: line-through; color: var(--taupe); }
+.chip.alert { border-color: var(--ink); border-inline-start: 3px solid var(--ink); }
+.chip-none { color: var(--taupe); }
+@keyframes pop { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.transcript { margin-top: 12px; font-size: 15px; color: var(--ink-2); background: var(--bone); border-inline-start: 2px solid var(--sand); padding: 10px 14px; }
+.transcript[hidden] { display: none; }
+.transcript small { display: block; font-size: 12px; color: var(--taupe); margin-bottom: 2px; }
+.panel-foot { margin-top: auto; padding-top: 24px; font-size: 13.5px; color: var(--ink-2); }
+
+/* Visit */
+.visit-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 80px; align-items: stretch; }
+.visit-photo { min-height: 620px; }
+.visit-info h2 { margin-bottom: 48px; }
+.visit-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; margin-bottom: 48px; }
+.visit-info h3.label { padding-bottom: 12px; border-bottom: 1px solid var(--ink); margin-bottom: 4px; }
+.hours { width: 100%; border-collapse: collapse; }
+.hours th, .hours td { padding-block: 9px; border-bottom: 1px solid var(--line); font-size: 15px; text-align: start; font-weight: 400; }
+.hours td { font-family: var(--mono); font-size: 13.5px; text-align: end; color: var(--ink); }
+.hours tr.closed td { color: var(--taupe); font-family: var(--sans); font-size: 14px; }
+.hours tr.today th { font-weight: 600; }
+address { font-style: normal; font-size: 16px; padding-block: 10px 6px; }
+address span { display: block; }
+address .mono { color: var(--ink-2); margin-top: 6px; }
+.small { font-size: 13px; color: var(--ink-2); }
+.numbered { list-style: none; counter-reset: n; }
+.numbered li { counter-increment: n; display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 8px; padding-block: 15px; border-bottom: 1px solid var(--line); font-size: 15.5px; }
+.numbered li::before { content: "0" counter(n); font-family: var(--mono); font-size: 12px; color: var(--taupe); padding-top: 4px; }
+
+/* For salon owners (the one dark section) */
+.owners { background: var(--ink); color: var(--bone); padding-block: 0; }
+.own-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 80px; align-items: stretch; }
+.own-photo { min-height: 640px; filter: grayscale(1); background: #3a312c; }
+.own-body { padding-block: 110px; }
+.owners .label { color: var(--sand); }
+.owners h2 { margin-block: 22px 24px; }
+.owners h2 em { color: #D7A796; }
+.owners .lede { color: rgba(244,239,232,.78); }
+.owners .numbered { margin-top: 40px; }
+.owners .numbered li { border-bottom-color: rgba(244,239,232,.16); }
+.owners .numbered li::before { color: var(--sand); }
+.owners .numbered strong { display: block; font-family: var(--serif); font-size: 25px; font-weight: 400; line-height: 1.2; margin-bottom: 4px; }
+html[lang="ar"] .owners .numbered strong { font-size: 21px; font-weight: 500; }
+.owners .numbered span { color: rgba(244,239,232,.72); font-size: 15px; }
+.trial { margin-top: 32px; font-family: var(--mono); font-size: 13.5px; color: var(--sand); }
+html[lang="ar"] .trial { font-family: var(--sans); font-size: 15px; }
+.ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
+.own-contact { display: flex; flex-wrap: wrap; gap: 14px 40px; margin-top: 36px; padding-top: 22px; border-top: 1px solid rgba(244,239,232,.16); }
+.own-contact dt { font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--sand); }
+html[lang="ar"] .own-contact dt { letter-spacing: 0; text-transform: none; font-size: 13px; }
+.own-contact dd { font-family: var(--mono); font-size: 14px; margin-top: 2px; }
+.own-contact a { text-decoration: none; border-bottom: 1px solid rgba(244,239,232,.35); }
+
+/* Footer */
+.site-footer { padding-block: 72px 28px; font-size: 14px; color: var(--ink-2); }
+.foot-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1fr); gap: 48px; padding-bottom: 40px; }
+.foot-grid .wordmark { margin-bottom: 14px; color: var(--ink); }
+.foot-grid .label { margin-bottom: 10px; }
+.credits a { text-underline-offset: 3px; text-decoration-color: var(--sand); }
+.policy { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.policy summary { cursor: pointer; padding-block: 18px; font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink); list-style: none; display: flex; justify-content: space-between; }
+html[lang="ar"] .policy summary { letter-spacing: 0; text-transform: none; font-size: 15px; }
+.policy summary::-webkit-details-marker { display: none; }
+.policy summary::after { content: "+"; font-family: var(--mono); font-size: 16px; font-weight: 400; }
+.policy[open] summary::after { content: "–"; }
+.policy-body { max-width: 760px; padding-bottom: 28px; }
+.policy-body h3 { font-size: 14px; font-weight: 600; color: var(--ink); margin-top: 18px; }
+.policy-body p, .policy-body li { margin-top: 6px; }
+.policy-body ul { padding-inline-start: 18px; }
+.foot-end { display: flex; justify-content: space-between; gap: 20px; padding-top: 22px; font-family: var(--mono); font-size: 12px; }
+.foot-end a { text-decoration: none; }
+
+/* Arabic: the mono font has no Arabic letters - keep numbers mono, words in the Arabic sans */
+html[lang="ar"] .svc-dur, html[lang="ar"] .foot-end, html[lang="ar"] .salon-panel h3 small { font-family: var(--sans); letter-spacing: 0; text-transform: none; }
+html[lang="ar"] .svc-dur bdi { font-family: var(--mono); }
+
+/* "Ask Yasmine" bar: phones only, replaces the old floating WhatsApp button */
+.ask-bar { display: none; }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1180px) {
+  .main-nav { gap: 20px; }
+  .main-nav a { font-size: 13.5px; }
+  /* French/Spanish navigation needs the room: one-line header down to 1061 px in every language */
+  .bar .wm-sub { display: none; }
+  .hero-grid { grid-template-columns: minmax(0, 1fr) 400px; grid-template-areas: "head chat" "body chat" "photo photo"; }
+  .hero-photo { min-height: 0; height: auto; aspect-ratio: 21 / 9; margin-top: 12px; }
+  .hero-photo img { object-position: center 30%; }
+}
+@media (max-width: 1060px) {
+  .main-nav, .bar-end .langs { display: none; }
+  .menu-btn { display: flex; }
+  .bar { justify-content: space-between; }
+  .svc-grid, .visit-grid, .own-grid { grid-template-columns: minmax(0, 1fr); gap: 48px; }
+  .svc-intro { position: static; }
+  .mosaic { max-width: 640px; }
+  .demo-grid { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+  .phone { margin-inline: auto; }
+  .visit-photo { min-height: 0; aspect-ratio: 16 / 9; }
+  .own-photo { min-height: 0; aspect-ratio: 16 / 9; margin-inline: calc(var(--gutter) * -1); }
+  .own-body { padding-block: 8px 88px; }
+  .section-head { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .section-head .lede { justify-self: start; }
+  .foot-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+@media (max-width: 760px) {
+  :root { --header-h: 58px; --gutter: 20px; }
+  body { font-size: 16px; padding-bottom: 76px; }
+  .label + h2 { margin-top: 16px; }
+  /* Content buttons span the column, so French/Spanish pairs line up and wrap evenly */
+  .svc-intro .btn, .ctas .btn { width: 100%; }
+  .wm-name { font-size: 26px; }
+  .wm-sub { display: none; }
+  .bar-end { gap: 6px; }
+  .bar-end .btn { min-height: 38px; padding: 9px 14px; }
+  .hero { padding-top: 16px; }
+  .hero-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "chat" "body" "photo"; row-gap: 18px; }
+  .hero-head { padding-top: 6px; }
+  .hero-head .label { margin-bottom: 12px; font-size: 11px; letter-spacing: .12em; }
+  h1 { font-size: 40px; line-height: 1.04; }
+  html[lang="ar"] h1 { font-size: 31px; }
+  h2 { font-size: 40px; }
+  html[lang="ar"] h2 { font-size: 30px; }
+  .live-chat { height: auto; }
+  .lc-head { padding: 12px 14px 8px; flex-direction: column; gap: 4px; }
+  .lc-title { font-size: 20px; }
+  .lc-langs { margin-inline-start: -5px; }
+  .lc-log { height: 196px; flex: none; padding: 12px 14px 6px; gap: 10px; }
+  .lc-log .msg { font-size: 14.5px; }
+  .lc-replies { flex-wrap: nowrap; overflow-x: auto; padding: 4px 14px 10px; scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+  .live-chat[dir="rtl"] .lc-replies { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 28px), transparent); }
+  .lc-replies::-webkit-scrollbar { display: none; }
+  .lc-chip { flex: none; white-space: nowrap; }
+  .lc-form input[type="text"] { padding: 14px; }
+  .lc-demo { padding: 8px 14px 10px; font-size: 11.5px; }
+  .hero-photo { aspect-ratio: 4 / 3; margin-inline: calc(var(--gutter) * -1); margin-top: 8px; }
+  .strip { margin-top: 0; flex-direction: column; gap: 6px; border-top: 0; padding-block: 14px 22px; }
+  .strip li + li::before { display: none; }
+  .section { padding-block: 80px; }
+  .svc { grid-template-columns: minmax(0, 1fr) auto; gap: 2px 16px; }
+  .svc-dur { grid-column: 1; grid-row: 2; }
+  .svc-price { grid-column: 2; grid-row: 1 / span 2; align-self: center; min-width: 0; }
+  .cat-head h3 { font-size: 28px; }
+  .tabs { gap: 22px; margin-inline: calc(var(--gutter) * -1); padding-inline: var(--gutter); margin-bottom: 28px;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent); }
+  html[dir="rtl"] .tabs { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 40px), transparent); }
+  .phone-screen { height: 500px; }
+  .salon-panel { padding: 24px 20px; }
+  .salon-panel h3 { font-size: 28px; }
+  .panel-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .visit-cols { grid-template-columns: minmax(0, 1fr); gap: 36px; }
+  .visit-photo { margin-inline: calc(var(--gutter) * -1); aspect-ratio: 4 / 3; }
+  .foot-grid { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+  .foot-end { flex-direction: column; }
+  .ask-bar { position: fixed; z-index: 50; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--ink); color: var(--bone); text-decoration: none; transform: translateY(140%); transition: transform .25s ease; }
+  .ask-bar.show { transform: none; }
+  .ask-bar .ask-dot { width: 7px; height: 7px; background: #9DBA98; flex: none; }
+  .ask-bar strong { display: block; font-family: var(--serif); font-size: 20px; font-weight: 400; line-height: 1.1; }
+  html[lang="ar"] .ask-bar strong { font-size: 17px; font-weight: 500; }
+  .ask-bar small { display: block; font-size: 12px; color: rgba(244,239,232,.7); }
+  .ask-bar .ask-arrow { margin-inline-start: auto; font-family: var(--mono); font-size: 18px; }
+  html[dir="rtl"] .ask-bar .ask-arrow { transform: scaleX(-1); }
+}
+@media (max-width: 380px) {
+  :root { --gutter: 16px; }
+  h1 { font-size: 36px; }
+  .bar-end .btn { padding-inline: 11px; }
+}
+</style>
+</head>
+<body>
+
+<header class="site-header" id="top">
+  <div class="wrap bar">
+    <a class="wordmark" href="#top" aria-label="Lumière Hair &amp; Beauty Studio">
+      <span class="wm-name">Lumière</span><span class="wm-sub label" data-i18n="brand.sub">Hair &amp; Beauty Studio</span>
+    </a>
+    <nav class="main-nav" aria-label="Main navigation" data-i18n-aria="nav.aria">
+      <a href="#services" data-i18n="nav.services">Services</a>
+      <a href="#studio" data-i18n="nav.studio">Studio</a>
+      <a href="#try" data-i18n="nav.try">Try the receptionist</a>
+      <a href="#owners" data-i18n="nav.owners">For salon owners</a>
+    </nav>
+    <div class="bar-end">
+      <div class="langs" role="group" aria-label="Website language" data-i18n-aria="nav.lang">
+        <button type="button" class="lang-btn" data-lang="en" lang="en" aria-label="English" aria-pressed="true">EN</button><span aria-hidden="true">·</span>
+        <button type="button" class="lang-btn" data-lang="fr" lang="fr" aria-label="Français" aria-pressed="false">FR</button><span aria-hidden="true">·</span>
+        <button type="button" class="lang-btn" data-lang="es" lang="es" aria-label="Español" aria-pressed="false">ES</button><span aria-hidden="true">·</span>
+        <button type="button" class="lang-btn" data-lang="ar" lang="ar" aria-label="العربية" aria-pressed="false">ع</button>
+      </div>
+      <a class="btn btn-solid btn-sm js-book" href="#chat" data-i18n="nav.book">Book</a>
+      <button class="menu-btn" id="menuOpen" type="button" aria-expanded="false" aria-controls="mobileMenu"><span class="sr-only" data-i18n="nav.menu">Menu</span><i></i><i></i></button>
+    </div>
+  </div>
+</header>
+
+<div class="mobile-menu" id="mobileMenu" role="dialog" aria-modal="true" aria-label="Menu" data-i18n-aria="nav.menu" hidden>
+  <div class="mm-top">
+    <span class="wordmark"><span class="wm-name">Lumière</span></span>
+    <button class="mm-close" id="menuClose" type="button"><span class="sr-only" data-i18n="nav.close">Close menu</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><path d="M5 5l14 14M19 5 5 19"/></svg></button>
+  </div>
+  <nav class="mm-nav" aria-label="Main navigation" data-i18n-aria="nav.aria">
+    <a href="#services" data-i18n="nav.services">Services</a>
+    <a href="#studio" data-i18n="nav.studio">Studio</a>
+    <a href="#try" data-i18n="nav.try">Try the receptionist</a>
+    <a href="#owners" data-i18n="nav.owners">For salon owners</a>
+  </nav>
+  <div class="langs" role="group" aria-label="Website language" data-i18n-aria="nav.lang">
+    <button type="button" class="lang-btn" data-lang="en" lang="en" aria-label="English" aria-pressed="true">EN</button><span aria-hidden="true">·</span>
+    <button type="button" class="lang-btn" data-lang="fr" lang="fr" aria-label="Français" aria-pressed="false">FR</button><span aria-hidden="true">·</span>
+    <button type="button" class="lang-btn" data-lang="es" lang="es" aria-label="Español" aria-pressed="false">ES</button><span aria-hidden="true">·</span>
+    <button type="button" class="lang-btn" data-lang="ar" lang="ar" aria-label="العربية" aria-pressed="false">ع</button>
+  </div>
+  <a class="btn btn-solid js-book" href="#chat" data-i18n="svc.ask">Ask Yasmine to book</a>
+</div>
+
+<main id="main">
+
+<!-- ============ 1. HERO + CHAT ============ -->
+<section class="hero" aria-labelledby="hero-title">
+  <div class="wrap hero-grid">
+    <div class="hero-head">
+      <p class="label" data-i18n="hero.eyebrow">Demo salon · Hair, colour, nails &amp; skin</p>
+      <h1 id="hero-title" data-i18n="hero.title" data-i18n-html>Hair, colour and care, <em>by appointment.</em></h1>
+    </div>
+
+    <div class="hero-body">
+      <p class="lede" data-i18n="hero.lede">A calm studio for cuts, colour, nails and facials. Yasmine, our receptionist, answers in English, French, Spanish and Arabic, and books you straight into the diary.</p>
+      <p class="frame" data-i18n="hero.frame" data-i18n-html><bdi class="nm">Lumière</bdi> is a demo salon. Yasmine is its AI receptionist. <a href="#owners">Get her for your salon</a>.</p>
+    </div>
+
+    <figure class="hero-photo ph">
+      <img src="https://images.unsplash.com/photo-1554519934-e32b1629d9ee?auto=format&amp;fit=crop&amp;w=900&amp;q=80" srcset="https://images.unsplash.com/photo-1554519934-e32b1629d9ee?auto=format&amp;fit=crop&amp;w=600&amp;q=80 600w, https://images.unsplash.com/photo-1554519934-e32b1629d9ee?auto=format&amp;fit=crop&amp;w=900&amp;q=80 900w, https://images.unsplash.com/photo-1554519934-e32b1629d9ee?auto=format&amp;fit=crop&amp;w=1600&amp;q=80 1600w" sizes="(max-width: 1180px) 100vw, 360px" alt="Long hair seen from behind, with a soft balayage" data-i18n-alt="photo.hero" width="900" height="1200" fetchpriority="high">
+    </figure>
+
+    <div class="hero-chat" id="chat">
+      <div class="live-chat" id="liveChat" role="region" aria-label="Demo conversation with Yasmine" aria-describedby="chatDisclaimer" lang="en" dir="ltr">
+        <div class="lc-head">
+          <div>
+            <strong class="lc-title" id="chatTitle">Yasmine · Lumière reception</strong>
+            <span class="lc-sub"><i aria-hidden="true"></i><span id="chatSub">AI receptionist · replies in seconds</span></span>
+          </div>
+          <fieldset class="lc-langs">
+            <legend class="sr-only" id="chatLegend">Conversation language</legend>
+            <label><input type="radio" name="chatLang" value="en" checked><span lang="en" aria-label="English">EN</span></label>
+            <label><input type="radio" name="chatLang" value="fr"><span lang="fr" aria-label="Français">FR</span></label>
+            <label><input type="radio" name="chatLang" value="es"><span lang="es" aria-label="Español">ES</span></label>
+            <label><input type="radio" name="chatLang" value="ar"><span lang="ar" aria-label="العربية">ع</span></label>
+          </fieldset>
+        </div>
+        <div class="lc-log" id="chatLog" role="log" aria-live="polite" aria-label="Conversation with Yasmine" tabindex="0"></div>
+        <div class="lc-replies" id="chatReplies" role="group" aria-label="Suggested messages"></div>
+        <form class="lc-form" id="chatForm" autocomplete="off" novalidate>
+          <div class="lc-hp" aria-hidden="true"><label>Website <input type="text" name="website" id="chatHp" tabindex="-1" autocomplete="off"></label></div>
+          <label class="sr-only" for="chatInput" id="chatInputLabel">Your message</label>
+          <input type="text" id="chatInput" maxlength="500" enterkeyhint="send" placeholder="Ask about prices, or book a time…">
+          <button class="lc-send" id="chatSend" type="submit" aria-label="Send">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 12h15M13 6l6 6-6 6"/></svg>
+          </button>
+        </form>
+        <p class="lc-demo" id="chatDisclaimer" data-i18n="chat.disclaimer">Demo salon: prices and hours are examples. Please use a fake name and no personal details.</p>
+      </div>
+    </div>
+  </div>
+  <div class="wrap">
+    <ul class="strip" id="infoStrip" aria-label="Opening hours and address" data-i18n-aria="strip.aria"></ul>
+  </div>
+</section>
+
+<!-- ============ 2. SERVICES & PRICES (generated from salon-info.js) ============ -->
+<section class="section services" id="services" aria-labelledby="svc-title">
+  <div class="wrap svc-grid">
+    <div class="svc-intro">
+      <p class="label" data-i18n="svc.kicker">The menu</p>
+      <h2 id="svc-title" data-i18n="svc.title" data-i18n-html>Services <em>&amp; prices</em></h2>
+      <p class="lede" data-i18n="svc.lede">These are the prices and durations Yasmine quotes and books. Prices marked “from” depend on hair length and products, and are confirmed at the salon.</p>
+      <a class="btn btn-solid js-book" href="#chat" data-i18n="svc.ask">Ask Yasmine to book</a>
+      <div class="mosaic">
+        <figure class="ph"><img src="https://images.unsplash.com/photo-1580618672591-eb180b1a973f?auto=format&amp;fit=crop&amp;w=700&amp;q=80" srcset="https://images.unsplash.com/photo-1580618672591-eb180b1a973f?auto=format&amp;fit=crop&amp;w=450&amp;q=80 450w, https://images.unsplash.com/photo-1580618672591-eb180b1a973f?auto=format&amp;fit=crop&amp;w=900&amp;q=80 900w" sizes="(max-width: 1060px) 55vw, 280px" alt="A hairdresser blow-drying a client's hair" data-i18n-alt="photo.blow" width="700" height="875" loading="lazy"></figure>
+        <figure class="ph"><img src="https://images.unsplash.com/photo-1612887390768-fb02affea7a6?auto=format&amp;fit=crop&amp;w=600&amp;q=80" srcset="https://images.unsplash.com/photo-1612887390768-fb02affea7a6?auto=format&amp;fit=crop&amp;w=400&amp;q=80 400w, https://images.unsplash.com/photo-1612887390768-fb02affea7a6?auto=format&amp;fit=crop&amp;w=800&amp;q=80 800w" sizes="(max-width: 1060px) 40vw, 210px" alt="Hands with a soft pink manicure" data-i18n-alt="photo.nails" width="600" height="800" loading="lazy"></figure>
+      </div>
+    </div>
+    <div class="menu" id="menuList" aria-live="off"></div>
+  </div>
+</section>
+
+<!-- ============ 3. TRY THE RECEPTIONIST ============ -->
+<section class="section try" id="try" aria-labelledby="try-title">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <p class="label" data-i18n="try.kicker">See it work</p>
+        <h2 id="try-title" data-i18n="try.title" data-i18n-html>Try the <em>receptionist</em></h2>
+      </div>
+      <p class="lede" data-i18n="try.lede">Pick a situation. The phone shows the conversation as the client sees it on WhatsApp. The panel shows what changes at the salon.</p>
+    </div>
+
+    <div class="tabs" role="tablist" aria-label="Situations" data-i18n-aria="demo.tabs">
+      <button class="tab" role="tab" aria-selected="true" aria-controls="demoPanel" data-scenario="booking" data-i18n="tab.booking">Book a haircut</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="demoPanel" data-scenario="reschedule" data-i18n="tab.reschedule">Reschedule</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="demoPanel" data-scenario="cancel" data-i18n="tab.cancel">Cancel</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="demoPanel" data-scenario="voice" data-i18n="tab.voice">Voice message</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="demoPanel" data-scenario="info" data-i18n="tab.info">Prices &amp; hours</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="demoPanel" data-scenario="urgent" data-i18n="tab.urgent">Reaction after a colour</button>
+    </div>
+
+    <div class="demo-grid" id="demoPanel" role="tabpanel">
+      <div class="phone">
+        <div class="phone-screen">
+          <div class="wa-bar">
+            <div class="wa-avatar" aria-hidden="true">L</div>
+            <div><strong data-i18n="hero.salon">Lumière Hair &amp; Beauty</strong><span data-i18n="hero.status">Yasmine is replying</span></div>
+          </div>
+          <div class="chat" id="demoChat"></div>
+          <div class="wa-input" aria-hidden="true"><div></div><span></span></div>
+        </div>
+      </div>
+
+      <div class="salon-panel" aria-live="polite">
+        <h3><span data-i18n="panel.title">At the salon</span><small data-i18n="panel.live">Live view</small></h3>
+        <dl>
+          <div class="panel-row"><dt data-i18n="panel.lang">Client's language</dt><dd id="panelLang">English</dd></div>
+          <div class="panel-row"><dt data-i18n="panel.agenda">Calendar and team</dt><dd id="panelChips"><span class="chip-none">–</span></dd></div>
+          <div class="panel-row">
+            <dt data-i18n="panel.action">What was done</dt>
+            <dd>
+              <div class="panel-status" id="panelStatus">
+                <span class="icon" aria-hidden="true"><span class="i-wait"><i></i><i></i><i></i></span><svg class="i-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"><path d="M20 6 9 17l-5-5"/></svg></span>
+                <span id="panelLog" data-i18n="panel.waiting">Yasmine is replying to the client…</span>
+              </div>
+              <div class="transcript" id="panelTranscript" hidden></div>
+            </dd>
+          </div>
+        </dl>
+        <p class="panel-foot" data-i18n="panel.foot">Demo examples with the fictional Lumière salon and its demo price list. Before going live, you approve Yasmine's answers with your own salon information.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4. VISIT, HOURS, POLICIES ============ -->
+<section class="section visit" id="studio" aria-labelledby="visit-title">
+  <div class="wrap visit-grid">
+    <figure class="visit-photo ph">
+      <img src="https://images.unsplash.com/photo-1626379501846-0df4067b8bb9?auto=format&amp;fit=crop&amp;w=900&amp;q=80" srcset="https://images.unsplash.com/photo-1626379501846-0df4067b8bb9?auto=format&amp;fit=crop&amp;w=600&amp;q=80 600w, https://images.unsplash.com/photo-1626379501846-0df4067b8bb9?auto=format&amp;fit=crop&amp;w=1200&amp;q=80 1200w" sizes="(max-width: 1060px) 100vw, 460px" alt="A bright styling station with a round mirror" data-i18n-alt="photo.studio" width="900" height="1200" loading="lazy">
+    </figure>
+    <div class="visit-info">
+      <p class="label" data-i18n="visit.kicker">The studio</p>
+      <h2 id="visit-title" data-i18n="visit.title" data-i18n-html>Visit <em>Lumière</em></h2>
+      <div class="visit-cols">
+        <div>
+          <h3 class="label" data-i18n="visit.hours">Opening hours</h3>
+          <table class="hours"><tbody id="hoursTable"></tbody></table>
+        </div>
+        <div>
+          <h3 class="label" data-i18n="visit.find">Find us</h3>
+          <address id="visitAddress"></address>
+          <p class="small" data-i18n="visit.note">Fictional address and contact details, for the demo.</p>
+        </div>
+      </div>
+      <h3 class="label" data-i18n="visit.good">Good to know</h3>
+      <ol class="numbered">
+        <li data-i18n="pol.1">Appointments are recommended. Walk-ins only when a time is free.</li>
+        <li data-i18n="pol.2">To change or cancel, please tell us at least 24 hours before.</li>
+        <li data-i18n="pol.3">More than 15 minutes late, the service may need to be shortened or moved.</li>
+        <li data-i18n="pol.4">First colour with us: a quick patch test at least 48 hours before is recommended.</li>
+        <li data-i18n="pol.5">Payment by card or cash at the salon. No online payment.</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 5. FOR SALON OWNERS ============ -->
+<section class="owners" id="owners" aria-labelledby="own-title">
+  <div class="wrap own-grid">
+    <figure class="own-photo ph">
+      <img src="https://images.unsplash.com/photo-1574015974293-817f0ebebb74?auto=format&amp;fit=crop&amp;w=900&amp;q=80" srcset="https://images.unsplash.com/photo-1574015974293-817f0ebebb74?auto=format&amp;fit=crop&amp;w=600&amp;q=80 600w, https://images.unsplash.com/photo-1574015974293-817f0ebebb74?auto=format&amp;fit=crop&amp;w=1200&amp;q=80 1200w" sizes="(max-width: 1060px) 100vw, 460px" alt="Black and white portrait" data-i18n-alt="photo.owner" width="900" height="1200" loading="lazy">
+    </figure>
+    <div class="own-body">
+      <p class="label" data-i18n="own.kicker">For salon owners</p>
+      <h2 id="own-title" data-i18n="own.title" data-i18n-html>Your salon, <em>answered.</em></h2>
+      <p class="lede" data-i18n="own.lede">Everything on this page is a demo. Yasmine is a real AI receptionist, and she can work for your salon with your own services, prices and opening hours.</p>
+      <ol class="numbered">
+        <li><div><strong data-i18n="own.1t">Answers day and night</strong><span data-i18n="own.1d">On WhatsApp, Messenger and your website, in English, French, Spanish and Arabic. Voice messages are understood in your salon's main language.</span></div></li>
+        <li><div><strong data-i18n="own.2t">Books into your calendar</strong><span data-i18n="own.2d">She offers only times that fit the full length of the service, then books, moves or cancels in your Google Calendar.</span></div></li>
+        <li><div><strong data-i18n="own.3t">Knows when to hand over</strong><span data-i18n="own.3d">Health questions and anything unusual go straight to your team, with an alert on WhatsApp.</span></div></li>
+      </ol>
+      <p class="trial" data-i18n="own.trial">Two-week free trial, no commitment.</p>
+      <div class="ctas">
+        <a class="btn btn-light js-wa" href="https://wa.me/213777744607" target="_blank" rel="noopener" data-i18n="own.cta1">Message on WhatsApp</a>
+        <a class="btn btn-line-light" href="mailto:mihoubihamzza@gmail.com" data-i18n="own.cta2">Send an e-mail</a>
+      </div>
+      <dl class="own-contact">
+        <div><dt data-i18n="own.phone">Phone &amp; WhatsApp</dt><dd><a href="tel:+213777744607" dir="ltr">+213 777 74 46 07</a></dd></div>
+        <div><dt data-i18n="own.email">E-mail</dt><dd><a href="mailto:mihoubihamzza@gmail.com">mihoubihamzza@gmail.com</a></dd></div>
+      </dl>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ============ 6. FOOTER ============ -->
+<footer class="site-footer">
+  <div class="wrap foot-grid">
+    <div>
+      <a class="wordmark" href="#top"><span class="wm-name">Lumière</span><span class="wm-sub label" data-i18n="brand.sub">Hair &amp; Beauty Studio</span></a>
+      <p data-i18n="foot.fict" data-i18n-html><bdi class="nm">Lumière Hair &amp; Beauty Studio</bdi> is a fictional demo salon.</p>
+    </div>
+    <div>
+      <p class="label" data-i18n="foot.by">Built by</p>
+      <p data-i18n="foot.made">Yasmine is designed, built and maintained by Hamza Mihoubi, self-employed (ANAE), chatbot developer. Bougara, Blida, Algeria.</p>
+    </div>
+    <div>
+      <p class="label" data-i18n="foot.photos">Photos</p>
+      <p class="credits"><a href="https://unsplash.com/photos/person-wearing-black-top-W6cwaL7PMSw" target="_blank" rel="noopener"><bdi>"Jessie Dee" Dabrowski</bdi></a>, <a href="https://unsplash.com/photos/hairstylist-blow-drying-client-hair-FkAZqQJTbXM" target="_blank" rel="noopener"><bdi>Adam Winger</bdi></a>, <a href="https://unsplash.com/photos/person-with-pink-manicure-on-white-textile-hvqHtZqNMeI" target="_blank" rel="noopener"><bdi>Jodene Isakowitz</bdi></a>, <a href="https://unsplash.com/photos/black-and-silver-office-rolling-chair-beside-mirror-gI9rvJK61L8" target="_blank" rel="noopener"><bdi>Giorgio Trovato</bdi></a>, <a href="https://unsplash.com/photos/grayscale-photography-of-woman-wearing-long-sleeved-shirt-UqT55tGBqzI" target="_blank" rel="noopener"><bdi>Ayo Ogunseinde</bdi></a>. <a href="https://unsplash.com/license" target="_blank" rel="noopener"><bdi>Unsplash License</bdi></a>.</p>
+    </div>
+  </div>
+  <div class="wrap">
+    <details class="policy" id="privacy">
+      <summary data-i18n="privacy.title">Privacy policy</summary>
+      <div class="policy-body">
+        <p data-i18n="privacy.intro">This policy explains how Hamza Mihoubi, self-employed, processes personal data when clients chat with Yasmine on WhatsApp, Messenger or a website on behalf of a salon.</p>
+        <h3 data-i18n="privacy.h1">Data processed</h3>
+        <ul>
+        <li data-i18n="privacy.l1">The client's WhatsApp number or Messenger ID, and their name.</li>
+        <li data-i18n="privacy.l2">The content of the messages and voice messages sent to the assistant.</li>
+        <li data-i18n="privacy.l3">Appointment details: date, time and the service requested.</li>
+        </ul>
+        <h3 data-i18n="privacy.h2">Use</h3>
+        <p data-i18n="privacy.p2">This data is only used to reply to the client, manage their appointments with the salon concerned and hand the conversation over to the salon team when needed. It is never sold or used for advertising.</p>
+        <h3 data-i18n="privacy.h3">Technical providers</h3>
+        <p data-i18n="privacy.p3">The service relies on providers to work: WhatsApp and Messenger (Meta) for messages, Google for the calendar and the conversation log, and artificial intelligence services to understand written and voice messages. Data is shared with them only for this purpose.</p>
+        <p data-i18n="privacy.p3b">Demo chat on this website: messages typed in the demo chat at the top of this page are sent to Hamza Mihoubi's server, then to the artificial intelligence service that generates Yasmine's replies. They are only used to produce these replies. Please do not enter personal information.</p>
+        <h3 data-i18n="privacy.h4">Retention</h3>
+        <p data-i18n="privacy.p4">Data is kept as long as needed to manage appointments and the relationship between the client and the salon, then deleted. Demo bookings made on this website are deleted automatically after 24 hours.</p>
+        <h3 data-i18n="privacy.h5">Your rights</h3>
+        <p data-i18n="privacy.p5">You can ask to access, correct or delete your data by writing to the e-mail address in the Contact section.</p>
+        <p class="updated" data-i18n="privacy.updated">Last updated: November 2026.</p>
+      </div>
+    </details>
+  </div>
+  <div class="wrap foot-end">
+    <bdi dir="ltr">© 2026 Hamza Mihoubi</bdi>
+    <a href="#top" data-i18n="foot.top">Back to top</a>
+  </div>
+</footer>
+
+<a class="ask-bar js-book" id="askBar" href="#chat" aria-hidden="true" tabindex="-1">
+  <span class="ask-dot" aria-hidden="true"></span>
+  <span><strong data-i18n="ask.label">Ask Yasmine</strong><small data-i18n="ask.sub">Prices, times and bookings</small></span>
+  <span class="ask-arrow" aria-hidden="true">→</span>
+</a>
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- Demo chat config (n8n) ---------- */
+  const CHAT_WEBHOOK_URL = "https://hundredth-silliness-crispy.ngrok-free.dev/webhook/lumiere-website-demo";    // n8n webhook (POST JSON). Kept in sync by website-demo/build-web-demo.js. Empty = the demo shows its "resting" message.
+  const CHAT_TIMEOUT_MS = 45000;  // no reply within this delay = "resting" message (a booking can take 10-30 s)
+  const CHAT_MAX_MESSAGES = 20;   // per visitor session
+  const CHAT_MAX_CHARS = 500;
+  const LANGS = ["en", "fr", "es", "ar"];
+  const WA_NUMBER = "213777744607"; // Hamza Mihoubi (the developer), for salon owners - never shown as the salon's number
+
+  /* ---------- Salon data: services, prices, durations, hours, contact ---------- */
+  const SALON_DATA = {"name":"Lumière Hair & Beauty Studio","currencySymbol":"€","address":"12 Avenue de la Lumière, Demo City","phone":"+00 000 000 000","email":"hello@lumiere-salon.example","hours":{"start":"09:00","end":"19:00","closedWeekday":0},"services":[{"key":"womens_cut","category":"Hair","name":"Women's haircut & styling","name_fr":"Coupe femme & coiffage","name_es":"Corte de mujer y peinado","name_ar":"قص وتصفيف شعر للنساء","duration":60,"price":45,"fromPrice":true},{"key":"mens_cut","category":"Hair","name":"Men's haircut","name_fr":"Coupe homme","name_es":"Corte de caballero","name_ar":"قص شعر للرجال","duration":30,"price":25,"fromPrice":false},{"key":"blow_dry","category":"Hair","name":"Blow-dry & styling","name_fr":"Brushing","name_es":"Secado y peinado (brushing)","name_ar":"تجفيف وتصفيف (براشينغ)","duration":30,"price":30,"fromPrice":true},{"key":"treatment","category":"Hair treatments","name":"Nourishing hair treatment (mask + blow-dry)","name_fr":"Soin nourrissant (masque + brushing)","name_es":"Tratamiento nutritivo (mascarilla + secado)","name_ar":"علاج مغذٍّ للشعر (ماسك + تجفيف)","duration":45,"price":40,"fromPrice":false},{"key":"keratin","category":"Hair treatments","name":"Keratin smoothing treatment","name_fr":"Lissage à la kératine","name_es":"Alisado de keratina","name_ar":"علاج تنعيم بالكيراتين","duration":150,"price":120,"fromPrice":true},{"key":"root_colour","category":"Colour","name":"Root colour touch-up","name_fr":"Coloration racines","name_es":"Tinte de raíces","name_ar":"صبغة الجذور","duration":90,"price":50,"fromPrice":false},{"key":"full_colour","category":"Colour","name":"Full hair colour","name_fr":"Coloration complète","name_es":"Tinte completo","name_ar":"صبغة كاملة للشعر","duration":120,"price":70,"fromPrice":true},{"key":"balayage","category":"Colour","name":"Balayage","name_fr":"Balayage","name_es":"Balayage","name_ar":"بالياج","duration":180,"price":140,"fromPrice":true},{"key":"manicure","category":"Nails","name":"Manicure","name_fr":"Manucure","name_es":"Manicura","name_ar":"مانيكير","duration":45,"price":25,"fromPrice":false},{"key":"gel_manicure","category":"Nails","name":"Gel manicure","name_fr":"Manucure semi-permanente","name_es":"Manicura semipermanente","name_ar":"مانيكير جل","duration":60,"price":35,"fromPrice":false},{"key":"pedicure","category":"Nails","name":"Pedicure","name_fr":"Pédicure","name_es":"Pedicura","name_ar":"باديكير","duration":60,"price":35,"fromPrice":false},{"key":"facial","category":"Facial & beauty","name":"Classic facial","name_fr":"Soin du visage classique","name_es":"Limpieza facial clásica","name_ar":"عناية كلاسيكية بالوجه","duration":60,"price":55,"fromPrice":false},{"key":"brows","category":"Facial & beauty","name":"Eyebrow shaping","name_fr":"Restructuration des sourcils","name_es":"Diseño de cejas","name_ar":"تشكيل الحواجب","duration":30,"price":15,"fromPrice":false}]}; // generated from salon-info.js + engine/config.js by website-demo/build-web-demo.js - do not edit by hand
+
+  /* ---------- Translations (English lives in the HTML; I18N.en holds script-only strings) ---------- */
+  /*I18N-START*/
+  var I18N = {
+    "en": {
+      "meta.title": "Lumière Hair & Beauty Studio · Demo salon with Yasmine, the AI receptionist",
+      "cat.hair": "Hair",
+      "cat.treat": "Hair treatments",
+      "cat.colour": "Colour",
+      "cat.nails": "Nails",
+      "cat.face": "Facial & beauty",
+      "svc.from": "from",
+      "svc.min": "min",
+      "visit.closed": "Closed",
+      "hours.daily": "Every day",
+      "strip.demo": "Demo salon",
+      "strip.pay": "Card or cash at the salon",
+      "wa.text": "Hello, I'd like to try Yasmine for my salon.",
+      "panel.none": "No change",
+      "panel.waiting": "Yasmine is replying to the client…"
+    },
+    "fr": {
+      "brand.sub": "Hair & Beauty Studio",
+      "demo.tabs": "Situations",
+      "hero.salon": "Lumière Hair & Beauty",
+      "hero.status": "Yasmine répond",
+      "nav.lang": "Langue du site",
+      "panel.action": "Ce qui a été fait",
+      "panel.agenda": "Agenda et équipe",
+      "panel.foot": "Exemples de démonstration avec le salon fictif Lumière et sa grille tarifaire de démo. Avant la mise en service, vous validez les réponses de Yasmine avec les informations de votre salon.",
+      "panel.lang": "Langue du client",
+      "panel.none": "Aucun changement",
+      "panel.title": "Côté salon",
+      "panel.waiting": "Yasmine répond au client…",
+      "privacy.h1": "Données traitées",
+      "privacy.h2": "Utilisation",
+      "privacy.h3": "Prestataires techniques",
+      "privacy.h4": "Conservation",
+      "privacy.h5": "Vos droits",
+      "privacy.intro": "Cette politique explique comment Hamza Mihoubi, auto-entrepreneur, traite les données personnelles lorsque des clients échangent avec Yasmine sur WhatsApp, Messenger ou un site web au nom d'un salon.",
+      "privacy.l1": "Le numéro WhatsApp ou l'identifiant Messenger du client, et son nom.",
+      "privacy.l2": "Le contenu des messages et des messages vocaux envoyés à l'assistante.",
+      "privacy.l3": "Les informations de rendez-vous : date, heure et prestation demandée.",
+      "privacy.p2": "Ces données servent uniquement à répondre au client, à gérer ses rendez-vous avec le salon concerné et à transmettre la conversation à l'équipe du salon si nécessaire. Elles ne sont ni vendues ni utilisées à des fins publicitaires.",
+      "privacy.p3": "Le service s'appuie sur des prestataires pour fonctionner : WhatsApp et Messenger (Meta) pour les messages, Google pour l'agenda et l'historique des échanges, et des services d'intelligence artificielle pour comprendre les messages écrits et vocaux. Les données leur sont transmises uniquement dans ce but.",
+      "privacy.p3b": "Conversation de démonstration du site : les messages saisis dans la démo en haut de cette page sont envoyés au serveur de Hamza Mihoubi, puis au service d'intelligence artificielle qui génère les réponses de Yasmine. Ils servent uniquement à produire ces réponses. Merci de ne pas y indiquer d'informations personnelles.",
+      "privacy.p4": "Les données sont conservées le temps nécessaire à la gestion des rendez-vous et à la relation entre le client et le salon, puis supprimées. Les rendez-vous de démonstration pris sur ce site sont supprimés automatiquement après 24 heures.",
+      "privacy.p5": "Vous pouvez demander l'accès, la correction ou la suppression de vos données en écrivant à l'adresse e-mail indiquée dans la section Contact.",
+      "privacy.title": "Politique de confidentialité",
+      "privacy.updated": "Dernière mise à jour : novembre 2026.",
+      "tab.booking": "Réserver une coupe",
+      "tab.cancel": "Annuler",
+      "tab.info": "Tarifs et horaires",
+      "tab.reschedule": "Déplacer",
+      "tab.urgent": "Réaction après une couleur",
+      "tab.voice": "Message vocal",
+      "meta.title": "Lumière Hair & Beauty Studio · Salon de démonstration avec Yasmine, la réceptionniste IA",
+      "nav.aria": "Navigation principale",
+      "nav.services": "Prestations",
+      "nav.studio": "Le studio",
+      "nav.try": "Essayer la réceptionniste",
+      "nav.owners": "Pour les salons",
+      "nav.book": "Réserver",
+      "nav.menu": "Menu",
+      "nav.close": "Fermer le menu",
+      "hero.eyebrow": "Salon de démonstration · Coiffure, couleur, ongles et soins",
+      "hero.title": "Coiffure, couleur et soins, <em>sur rendez-vous.</em>",
+      "hero.lede": "Un studio calme pour les coupes, la couleur, les ongles et les soins du visage. Yasmine, notre réceptionniste, répond en anglais, français, espagnol et arabe, et vous inscrit directement à l'agenda.",
+      "hero.frame": "Lumière est un salon de démonstration. Yasmine est sa réceptionniste IA. <a href=\"#owners\">Adoptez-la pour votre salon</a>.",
+      "photo.hero": "Cheveux longs vus de dos, avec un balayage doux",
+      "photo.blow": "Une coiffeuse fait un brushing à une cliente",
+      "photo.nails": "Mains avec une manucure rose pâle",
+      "photo.studio": "Un poste de coiffure lumineux avec un miroir rond",
+      "photo.owner": "Portrait en noir et blanc",
+      "chat.disclaimer": "Salon de démonstration : les prix et les horaires sont des exemples. Utilisez un faux nom, sans informations personnelles.",
+      "strip.aria": "Horaires et adresse",
+      "strip.demo": "Salon de démonstration",
+      "strip.pay": "Carte ou espèces au salon",
+      "svc.kicker": "La carte",
+      "svc.title": "Prestations <em>&amp; tarifs</em>",
+      "svc.lede": "Ce sont les tarifs et les durées que Yasmine annonce et réserve. Les prix « dès » dépendent de la longueur des cheveux et des produits, et sont confirmés au salon.",
+      "svc.ask": "Réserver avec Yasmine",
+      "svc.from": "dès",
+      "svc.min": "min",
+      "cat.hair": "Coiffure",
+      "cat.treat": "Soins capillaires",
+      "cat.colour": "Couleur",
+      "cat.nails": "Ongles",
+      "cat.face": "Visage et beauté",
+      "try.kicker": "En situation",
+      "try.title": "Essayez la <em>réceptionniste</em>",
+      "try.lede": "Choisissez une situation. Le téléphone montre la conversation telle que la cliente la voit sur WhatsApp. Le panneau montre ce qui change au salon.",
+      "panel.live": "En direct",
+      "visit.kicker": "Le studio",
+      "visit.title": "Venir chez <em>Lumière</em>",
+      "visit.hours": "Horaires",
+      "visit.closed": "Fermé",
+      "visit.find": "Nous trouver",
+      "visit.note": "Adresse et coordonnées fictives, pour la démonstration.",
+      "visit.good": "Bon à savoir",
+      "hours.daily": "Tous les jours",
+      "pol.1": "Le rendez-vous est conseillé. Sans rendez-vous seulement si un créneau est libre.",
+      "pol.2": "Pour déplacer ou annuler, prévenez-nous au moins 24 heures avant.",
+      "pol.3": "Au-delà de 15 minutes de retard, la prestation peut être raccourcie ou déplacée.",
+      "pol.4": "Première couleur chez nous : un test cutané au moins 48 heures avant est conseillé.",
+      "pol.5": "Paiement par carte ou en espèces au salon. Pas de paiement en ligne.",
+      "own.kicker": "Pour les salons",
+      "own.title": "Votre salon, <em>toujours à l'écoute.</em>",
+      "own.lede": "Tout sur cette page est une démonstration. Yasmine, elle, est une vraie réceptionniste IA, et elle peut travailler pour votre salon avec vos prestations, vos tarifs et vos horaires.",
+      "own.1t": "Répond jour et nuit",
+      "own.1d": "Sur WhatsApp, Messenger et votre site, en anglais, français, espagnol et arabe. Les messages vocaux sont compris dans la langue principale de votre salon.",
+      "own.2t": "Remplit votre agenda",
+      "own.2d": "Elle ne propose que des créneaux adaptés à toute la durée de la prestation, puis réserve, déplace ou annule dans votre Google Agenda.",
+      "own.3t": "Sait passer la main",
+      "own.3d": "Les questions de santé et les demandes inhabituelles vont directement à votre équipe, avec une alerte sur WhatsApp.",
+      "own.trial": "Deux semaines d'essai gratuit, sans engagement.",
+      "own.cta1": "Écrire sur WhatsApp",
+      "own.cta2": "Envoyer un e-mail",
+      "own.phone": "Téléphone et WhatsApp",
+      "own.email": "E-mail",
+      "foot.fict": "Lumière Hair & Beauty Studio est un salon fictif de démonstration.",
+      "foot.by": "Conçu par",
+      "foot.made": "Yasmine est conçue, développée et maintenue par Hamza Mihoubi, auto-entrepreneur (ANAE), développeur de chatbots. Bougara, Blida, Algérie.",
+      "foot.photos": "Photos",
+      "foot.top": "Haut de page",
+      "ask.label": "Demander à Yasmine",
+      "ask.sub": "Tarifs, créneaux et réservations",
+      "wa.text": "Bonjour, je voudrais essayer Yasmine pour mon salon."
+    },
+    "es": {
+      "brand.sub": "Hair & Beauty Studio",
+      "demo.tabs": "Situaciones",
+      "hero.salon": "Lumière Hair & Beauty",
+      "hero.status": "Yasmine está respondiendo",
+      "nav.lang": "Idioma del sitio",
+      "panel.action": "Lo que se ha hecho",
+      "panel.agenda": "Agenda y equipo",
+      "panel.foot": "Ejemplos de demostración con el salón ficticio Lumière y su lista de precios de demo. Antes de ponerla en marcha, validas las respuestas de Yasmine con la información de tu salón.",
+      "panel.lang": "Idioma del cliente",
+      "panel.none": "Sin cambios",
+      "panel.title": "En el salón",
+      "panel.waiting": "Yasmine está respondiendo al cliente…",
+      "privacy.h1": "Datos tratados",
+      "privacy.h2": "Uso",
+      "privacy.h3": "Proveedores técnicos",
+      "privacy.h4": "Conservación",
+      "privacy.h5": "Tus derechos",
+      "privacy.intro": "Esta política explica cómo Hamza Mihoubi, autónomo, trata los datos personales cuando los clientes hablan con Yasmine por WhatsApp, Messenger o una web en nombre de un salón.",
+      "privacy.l1": "El número de WhatsApp o el identificador de Messenger del cliente, y su nombre.",
+      "privacy.l2": "El contenido de los mensajes y notas de voz enviados a la asistente.",
+      "privacy.l3": "Los datos de la cita: fecha, hora y servicio solicitado.",
+      "privacy.p2": "Estos datos solo se usan para responder al cliente, gestionar sus citas con el salón correspondiente y pasar la conversación al equipo del salón cuando haga falta. Nunca se venden ni se usan con fines publicitarios.",
+      "privacy.p3": "El servicio funciona con varios proveedores: WhatsApp y Messenger (Meta) para los mensajes, Google para la agenda y el registro de conversaciones, y servicios de inteligencia artificial para entender los mensajes escritos y de voz. Los datos se comparten con ellos solo con este fin.",
+      "privacy.p3b": "Chat de demostración de esta web: los mensajes que escribes en la demo de la parte superior se envían al servidor de Hamza Mihoubi y después al servicio de inteligencia artificial que genera las respuestas de Yasmine. Solo se usan para producir esas respuestas. Por favor, no escribas datos personales.",
+      "privacy.p4": "Los datos se conservan el tiempo necesario para gestionar las citas y la relación entre el cliente y el salón, y después se eliminan. Las citas de demostración hechas en esta web se borran automáticamente a las 24 horas.",
+      "privacy.p5": "Puedes pedir el acceso, la corrección o la eliminación de tus datos escribiendo al correo indicado en la sección Contacto.",
+      "privacy.title": "Política de privacidad",
+      "privacy.updated": "Última actualización: noviembre de 2026.",
+      "tab.booking": "Reservar un corte",
+      "tab.cancel": "Cancelar",
+      "tab.info": "Precios y horario",
+      "tab.reschedule": "Cambiar cita",
+      "tab.urgent": "Reacción tras un tinte",
+      "tab.voice": "Nota de voz",
+      "meta.title": "Lumière Hair & Beauty Studio · Salón de demostración con Yasmine, la recepcionista con IA",
+      "nav.aria": "Navegación principal",
+      "nav.services": "Servicios",
+      "nav.studio": "El estudio",
+      "nav.try": "Probar la recepcionista",
+      "nav.owners": "Para salones",
+      "nav.book": "Reservar",
+      "nav.menu": "Menú",
+      "nav.close": "Cerrar el menú",
+      "hero.eyebrow": "Salón de demostración · Peluquería, color, uñas y piel",
+      "hero.title": "Peluquería, color y cuidado, <em>con cita.</em>",
+      "hero.lede": "Un estudio tranquilo para cortes, color, uñas y tratamientos faciales. Yasmine, nuestra recepcionista, responde en inglés, francés, español y árabe, y te apunta directamente en la agenda.",
+      "hero.frame": "Lumière es un salón de demostración. Yasmine es su recepcionista con IA. <a href=\"#owners\">Tenla en tu salón</a>.",
+      "photo.hero": "Pelo largo visto de espaldas, con un balayage suave",
+      "photo.blow": "Una peluquera seca el pelo de una clienta",
+      "photo.nails": "Manos con una manicura rosa suave",
+      "photo.studio": "Un puesto de peluquería luminoso con un espejo redondo",
+      "photo.owner": "Retrato en blanco y negro",
+      "chat.disclaimer": "Salón de demostración: los precios y horarios son ejemplos. Usa un nombre falso y no compartas datos personales.",
+      "strip.aria": "Horario y dirección",
+      "strip.demo": "Salón de demostración",
+      "strip.pay": "Tarjeta o efectivo en el salón",
+      "svc.kicker": "La carta",
+      "svc.title": "Servicios <em>y precios</em>",
+      "svc.lede": "Estos son los precios y duraciones que Yasmine indica y reserva. Los precios «desde» dependen del largo del pelo y de los productos, y se confirman en el salón.",
+      "svc.ask": "Reservar con Yasmine",
+      "svc.from": "desde",
+      "svc.min": "min",
+      "cat.hair": "Peluquería",
+      "cat.treat": "Tratamientos capilares",
+      "cat.colour": "Color",
+      "cat.nails": "Uñas",
+      "cat.face": "Facial y belleza",
+      "try.kicker": "En acción",
+      "try.title": "Prueba la <em>recepcionista</em>",
+      "try.lede": "Elige una situación. El teléfono muestra la conversación tal como la ve la clienta en WhatsApp. El panel muestra lo que cambia en el salón.",
+      "panel.live": "En directo",
+      "visit.kicker": "El estudio",
+      "visit.title": "Visita <em>Lumière</em>",
+      "visit.hours": "Horario",
+      "visit.closed": "Cerrado",
+      "visit.find": "Dónde estamos",
+      "visit.note": "Dirección y contacto ficticios, para la demo.",
+      "visit.good": "Conviene saber",
+      "hours.daily": "Todos los días",
+      "pol.1": "Se recomienda pedir cita. Sin cita solo si hay una hora libre.",
+      "pol.2": "Para cambiar o cancelar, avísanos al menos 24 horas antes.",
+      "pol.3": "Con más de 15 minutos de retraso, el servicio puede acortarse o cambiarse de hora.",
+      "pol.4": "Primer color con nosotros: se recomienda una prueba de alergia al menos 48 horas antes.",
+      "pol.5": "Pago con tarjeta o en efectivo en el salón. Sin pago en línea.",
+      "own.kicker": "Para salones",
+      "own.title": "Tu salón, <em>siempre atendido.</em>",
+      "own.lede": "Todo en esta página es una demo. Yasmine es una recepcionista con IA real, y puede trabajar para tu salón con tus servicios, precios y horarios.",
+      "own.1t": "Responde día y noche",
+      "own.1d": "En WhatsApp, Messenger y tu web, en inglés, francés, español y árabe. Las notas de voz se entienden en el idioma principal de tu salón.",
+      "own.2t": "Reserva en tu agenda",
+      "own.2d": "Solo ofrece horas en las que cabe el servicio completo, y reserva, cambia o cancela en tu Google Calendar.",
+      "own.3t": "Sabe cuándo pasar la conversación",
+      "own.3d": "Las preguntas de salud y todo lo inusual van directamente a tu equipo, con un aviso por WhatsApp.",
+      "own.trial": "Dos semanas de prueba gratis, sin compromiso.",
+      "own.cta1": "Escribir por WhatsApp",
+      "own.cta2": "Enviar un correo",
+      "own.phone": "Teléfono y WhatsApp",
+      "own.email": "Correo electrónico",
+      "foot.fict": "Lumière Hair & Beauty Studio es un salón ficticio de demostración.",
+      "foot.by": "Creado por",
+      "foot.made": "Yasmine está diseñada, desarrollada y mantenida por Hamza Mihoubi, autónomo (ANAE), desarrollador de chatbots. Bougara, Blida, Argelia.",
+      "foot.photos": "Fotos",
+      "foot.top": "Volver arriba",
+      "ask.label": "Pregunta a Yasmine",
+      "ask.sub": "Precios, horas y reservas",
+      "wa.text": "Hola, me gustaría probar Yasmine en mi salón."
+    },
+    "ar": {
+      "brand.sub": "Hair & Beauty Studio",
+      "demo.tabs": "الحالات",
+      "hero.salon": "Lumière Hair & Beauty",
+      "hero.status": "ياسمين ترد",
+      "nav.lang": "لغة الموقع",
+      "panel.action": "ما تم",
+      "panel.agenda": "الأجندة والفريق",
+      "panel.foot": "أمثلة توضيحية مع صالون Lumière الوهمي وقائمة أسعاره التجريبية. قبل التشغيل، توافق على أجوبة ياسمين بمعلومات صالونك.",
+      "panel.lang": "لغة العميل",
+      "panel.none": "لا تغيير",
+      "panel.title": "في الصالون",
+      "panel.waiting": "ياسمين ترد على العميل…",
+      "privacy.h1": "المعطيات المعالجة",
+      "privacy.h2": "الاستعمال",
+      "privacy.h3": "مزوّدو الخدمات التقنية",
+      "privacy.h4": "مدة الحفظ",
+      "privacy.h5": "حقوقك",
+      "privacy.intro": "توضح هذه السياسة كيف يعالج حمزة ميهوبي (Hamza Mihoubi)، مقاول ذاتي، المعطيات الشخصية عندما يتواصل العملاء مع ياسمين عبر واتساب أو ماسنجر أو موقع إلكتروني باسم صالون.",
+      "privacy.l1": "رقم واتساب العميل أو معرّفه في ماسنجر، واسمه.",
+      "privacy.l2": "محتوى الرسائل والرسائل الصوتية المرسلة إلى المساعدة.",
+      "privacy.l3": "معلومات الموعد: التاريخ، الوقت، والخدمة المطلوبة.",
+      "privacy.p2": "تُستعمل هذه المعطيات فقط للرد على العميل، وتسيير مواعيده مع الصالون المعني، وتحويل المحادثة إلى فريق الصالون عند الحاجة. لا تُباع ولا تُستعمل لأغراض إشهارية.",
+      "privacy.p3": "تعتمد الخدمة على مزوّدين لتعمل: واتساب وماسنجر (Meta) للرسائل، Google للأجندة وسجل المحادثات، وخدمات ذكاء اصطناعي لفهم الرسائل المكتوبة والصوتية. تُرسل المعطيات إليهم لهذا الغرض فقط.",
+      "privacy.p3b": "المحادثة التجريبية في الموقع: الرسائل التي تكتبها في التجربة أعلى هذه الصفحة تُرسل إلى خادم حمزة ميهوبي (Hamza Mihoubi)، ثم إلى خدمة الذكاء الاصطناعي التي تولّد ردود ياسمين. تُستعمل فقط لإنتاج هذه الردود. نرجو عدم كتابة معلومات شخصية فيها.",
+      "privacy.p4": "تُحفظ المعطيات طوال المدة اللازمة لتسيير المواعيد والعلاقة بين العميل والصالون، ثم تُحذف. المواعيد التجريبية المحجوزة في هذا الموقع تُحذف تلقائياً بعد 24 ساعة.",
+      "privacy.p5": "يمكنك طلب الاطلاع على معطياتك أو تصحيحها أو حذفها بمراسلة البريد الإلكتروني المذكور في قسم الاتصال.",
+      "privacy.title": "سياسة الخصوصية",
+      "privacy.updated": "آخر تحديث: نوفمبر 2026.",
+      "tab.booking": "حجز قصة شعر",
+      "tab.cancel": "إلغاء موعد",
+      "tab.info": "الأسعار والأوقات",
+      "tab.reschedule": "تغيير موعد",
+      "tab.urgent": "تفاعل بعد الصبغة",
+      "tab.voice": "رسالة صوتية",
+      "meta.title": "Lumière Hair & Beauty Studio · صالون تجريبي مع ياسمين، موظفة الاستقبال الذكية",
+      "nav.aria": "التنقل الرئيسي",
+      "nav.services": "الخدمات",
+      "nav.studio": "الاستوديو",
+      "nav.try": "جرّب موظفة الاستقبال",
+      "nav.owners": "لأصحاب الصالونات",
+      "nav.book": "احجز",
+      "nav.menu": "القائمة",
+      "nav.close": "إغلاق القائمة",
+      "hero.eyebrow": "صالون تجريبي · شعر، صبغة، أظافر وبشرة",
+      "hero.title": "الشعر والصبغة والعناية، <em>بموعد مسبق.</em>",
+      "hero.lede": "استوديو هادئ للقص والصبغة والأظافر والعناية بالوجه. ياسمين، موظفة الاستقبال لدينا، ترد بالإنجليزية والفرنسية والإسبانية والعربية، وتسجّل موعدك مباشرة في الأجندة.",
+      "hero.frame": "Lumière صالون تجريبي، وياسمين هي موظفة الاستقبال الذكية فيه. <a href=\"#owners\">احصل عليها لصالونك</a>.",
+      "photo.hero": "شعر طويل من الخلف مع بالياج ناعم",
+      "photo.blow": "مصففة تجفف شعر عميلة",
+      "photo.nails": "يدان بمانيكير وردي فاتح",
+      "photo.studio": "ركن تصفيف مضيء بمرآة دائرية",
+      "photo.owner": "صورة بالأبيض والأسود",
+      "chat.disclaimer": "صالون تجريبي: الأسعار والأوقات مجرد أمثلة. استخدم اسماً غير حقيقي ولا تشارك معلومات شخصية.",
+      "strip.aria": "أوقات العمل والعنوان",
+      "strip.demo": "صالون تجريبي",
+      "strip.pay": "الدفع بالبطاقة أو نقداً في الصالون",
+      "svc.kicker": "قائمة الخدمات",
+      "svc.title": "الخدمات <em>والأسعار</em>",
+      "svc.lede": "هذه هي الأسعار والمدد التي تذكرها ياسمين وتحجز على أساسها. الأسعار المسبوقة بكلمة «من» تختلف حسب طول الشعر والمنتجات، وتُؤكَّد في الصالون.",
+      "svc.ask": "احجز مع ياسمين",
+      "svc.from": "من",
+      "svc.min": "دقيقة",
+      "cat.hair": "الشعر",
+      "cat.treat": "علاجات الشعر",
+      "cat.colour": "الصبغة",
+      "cat.nails": "الأظافر",
+      "cat.face": "الوجه والتجميل",
+      "try.kicker": "شاهدها تعمل",
+      "try.title": "جرّب <em>موظفة الاستقبال</em>",
+      "try.lede": "اختر موقفاً. يعرض الهاتف المحادثة كما تراها العميلة على واتساب، وتعرض اللوحة ما يتغيّر في الصالون.",
+      "panel.live": "مباشر",
+      "visit.kicker": "الاستوديو",
+      "visit.title": "زوروا <em>لوميير</em>",
+      "visit.hours": "أوقات العمل",
+      "visit.closed": "مغلق",
+      "visit.find": "العنوان",
+      "visit.note": "عنوان وبيانات اتصال وهمية، لأغراض العرض فقط.",
+      "visit.good": "معلومات مفيدة",
+      "hours.daily": "كل يوم",
+      "pol.1": "يُنصح بحجز موعد مسبقاً. الاستقبال دون موعد فقط إذا كان هناك وقت شاغر.",
+      "pol.2": "لتغيير الموعد أو إلغائه، أخبرونا قبل 24 ساعة على الأقل.",
+      "pol.3": "عند التأخر أكثر من 15 دقيقة، قد تُختصر الخدمة أو تُنقل إلى وقت آخر.",
+      "pol.4": "أول صبغة عندنا: يُنصح باختبار حساسية قبل 48 ساعة على الأقل.",
+      "pol.5": "الدفع بالبطاقة أو نقداً في الصالون. لا يوجد دفع عبر الإنترنت.",
+      "own.kicker": "لأصحاب الصالونات",
+      "own.title": "صالونك، <em>يردّ دائماً.</em>",
+      "own.lede": "كل ما في هذه الصفحة عرض تجريبي. أما ياسمين فهي موظفة استقبال ذكية حقيقية، ويمكنها العمل لصالونك بخدماتك وأسعارك وأوقات عملك.",
+      "own.1t": "ترد ليلاً ونهاراً",
+      "own.1d": "على واتساب وماسنجر وموقعك، بالإنجليزية والفرنسية والإسبانية والعربية. وتُفهم الرسائل الصوتية باللغة الرئيسية لصالونك.",
+      "own.2t": "تحجز في أجندتك",
+      "own.2d": "لا تقترح إلا أوقاتاً تتسع لمدة الخدمة كاملة، ثم تحجز أو تغيّر أو تلغي في Google Calendar.",
+      "own.3t": "تعرف متى تحوّل المحادثة",
+      "own.3d": "الأسئلة الصحية والطلبات غير المعتادة تذهب مباشرة إلى فريقك، مع تنبيه على واتساب.",
+      "own.trial": "تجربة مجانية لمدة أسبوعين، دون أي التزام.",
+      "own.cta1": "راسلنا على واتساب",
+      "own.cta2": "أرسل بريداً إلكترونياً",
+      "own.phone": "الهاتف وواتساب",
+      "own.email": "البريد الإلكتروني",
+      "foot.fict": "Lumière Hair & Beauty Studio صالون تجريبي وهمي.",
+      "foot.by": "من تطوير",
+      "foot.made": "صمّم ياسمين وطوّرها ويتولى صيانتها حمزة ميهوبي، مقاول ذاتي (ANAE)، مطوّر روبوتات محادثة. بوقرة، البليدة، الجزائر.",
+      "foot.photos": "الصور",
+      "foot.top": "العودة إلى الأعلى",
+      "ask.label": "اسأل ياسمين",
+      "ask.sub": "الأسعار والمواعيد والحجز",
+      "wa.text": "مرحباً، أود تجربة ياسمين لصالوني."
+    }
+  };
+  /*I18N-END*/
+
+  var lang = "en";
+  var htmlCache = new WeakMap();
+  var attrCache = new WeakMap();
+  var NAME_RE = /Lumière(?: Hair (?:&amp;|&) Beauty(?: Studio)?)?/g;
+  var LOCALE = { en: "en-GB", fr: "fr-FR", es: "es-ES", ar: "ar-u-nu-latn" };
+
+  function t(key) {
+    var d = I18N[lang] || {};
+    if (d[key] != null) return d[key];
+    return I18N.en[key] != null ? I18N.en[key] : "";
+  }
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  // The Latin salon name is isolated so it never breaks apart inside Arabic sentences.
+  function isolateName(html) { return html.replace(NAME_RE, function (m) { return '<bdi class="nm">' + m + "</bdi>"; }); }
+  function cached(el, attr) {
+    var c = attrCache.get(el) || {};
+    if (!(attr in c)) { c[attr] = el.getAttribute(attr) || ""; attrCache.set(el, c); }
+    return c[attr];
+  }
+
+  function updateWaLinks() {
+    var href = "https://wa.me/" + WA_NUMBER + "?text=" + encodeURIComponent(t("wa.text"));
+    document.querySelectorAll(".js-wa").forEach(function (a) { a.href = href; });
+  }
+
+  function setLang(next) {
+    if (LANGS.indexOf(next) < 0) next = "en";
+    lang = next;
+    var root = document.documentElement;
+    root.lang = next;
+    root.dir = next === "ar" ? "rtl" : "ltr";
+    var dict = I18N[next] || {};
+    var en = next === "en";
+    document.querySelectorAll("[data-i18n]").forEach(function (el) {
+      if (!htmlCache.has(el)) htmlCache.set(el, el.innerHTML);
+      var v = dict[el.getAttribute("data-i18n")];
+      if (en || v == null) { el.innerHTML = htmlCache.get(el); return; }
+      el.innerHTML = isolateName(el.hasAttribute("data-i18n-html") ? v : esc(v));
+    });
+    document.querySelectorAll("[data-i18n-aria]").forEach(function (el) {
+      var v = dict[el.getAttribute("data-i18n-aria")];
+      el.setAttribute("aria-label", !en && v != null ? v : cached(el, "aria-label"));
+    });
+    document.querySelectorAll("[data-i18n-alt]").forEach(function (el) {
+      var v = dict[el.getAttribute("data-i18n-alt")];
+      el.setAttribute("alt", !en && v != null ? v : cached(el, "alt"));
+    });
+    document.querySelectorAll(".lang-btn").forEach(function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-lang") === next ? "true" : "false"); });
+    document.title = en ? cached(document.documentElement, "data-title") || document.title : t("meta.title");
+    renderSalon();
+    updateWaLinks();
+    chatFollowSite(next);
+    if (currentScenario) renderPanel(currentScenario, panelDone);
+    try { localStorage.setItem("lumiere-lang", next); } catch (e) {}
+  }
+
+  /* ---------- Menu, hours, info strip, address (from SALON_DATA) ---------- */
+  var CAT_KEYS = { "Hair": "cat.hair", "Hair treatments": "cat.treat", "Colour": "cat.colour", "Nails": "cat.nails", "Facial & beauty": "cat.face" };
+  var D = SALON_DATA;
+  function money(n) { return lang === "en" ? D.currencySymbol + n : n + " " + D.currencySymbol; }
+  function svcName(s) { return (lang !== "en" && s["name_" + lang]) || s.name; }
+  function weekday(d, style) {
+    // 2026-01-04 is a Sunday: d = 0 (Sunday) ... 6 (Saturday)
+    try { return new Intl.DateTimeFormat(LOCALE[lang], { weekday: style, timeZone: "UTC" }).format(new Date(Date.UTC(2026, 0, 4 + d))); }
+    catch (e) { return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d]; }
+  }
+  function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+  function isOpen(d) { return D.hours.closedWeekday !== d; }
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function ltr(text, cls) { var b = el("bdi", cls, text); b.dir = "ltr"; return b; }
+
+  function renderMenu() {
+    var box = document.getElementById("menuList");
+    box.innerHTML = "";
+    var order = [], groups = {};
+    D.services.forEach(function (s) { if (!groups[s.category]) { groups[s.category] = []; order.push(s.category); } groups[s.category].push(s); });
+    order.forEach(function (cat, i) {
+      var c = el("div", "cat");
+      var head = el("div", "cat-head");
+      head.appendChild(el("span", "num", (i < 9 ? "0" : "") + (i + 1)));
+      head.appendChild(el("h3", null, CAT_KEYS[cat] ? t(CAT_KEYS[cat]) : cat));
+      c.appendChild(head);
+      groups[cat].forEach(function (s) {
+        var row = el("div", "svc");
+        row.setAttribute("data-key", s.key);
+        row.appendChild(el("span", "svc-name", svcName(s)));
+        var dur = el("span", "svc-dur");
+        dur.appendChild(ltr(String(s.duration))); dur.appendChild(document.createTextNode(" " + t("svc.min")));
+        row.appendChild(dur);
+        var price = el("span", "svc-price");
+        if (s.fromPrice) price.appendChild(el("small", null, t("svc.from")));
+        price.appendChild(ltr(money(s.price)));
+        row.appendChild(price);
+        c.appendChild(row);
+      });
+      box.appendChild(c);
+    });
+  }
+
+  function openDaysLabel() {
+    var cd = D.hours.closedWeekday;
+    if (cd < 0 || cd > 6) return t("hours.daily");
+    return cap(weekday((cd + 1) % 7, "short")) + "–" + cap(weekday((cd + 6) % 7, "short"));
+  }
+
+  function renderHours() {
+    var tb = document.getElementById("hoursTable");
+    tb.innerHTML = "";
+    var today = new Date().getDay();
+    [1, 2, 3, 4, 5, 6, 0].forEach(function (d) {
+      var tr = el("tr", (isOpen(d) ? "" : "closed") + (d === today ? " today" : ""));
+      var th = el("th", null, cap(weekday(d, "long")));
+      th.scope = "row";
+      var td = el("td");
+      if (isOpen(d)) td.appendChild(ltr(D.hours.start + "–" + D.hours.end)); else td.textContent = t("visit.closed");
+      tr.appendChild(th); tr.appendChild(td);
+      tb.appendChild(tr);
+    });
+  }
+
+  function renderStrip() {
+    var ul = document.getElementById("infoStrip");
+    ul.innerHTML = "";
+    var li1 = el("li"); li1.appendChild(document.createTextNode(openDaysLabel() + " ")); li1.appendChild(ltr(D.hours.start + "–" + D.hours.end)); ul.appendChild(li1);
+    var li2 = el("li"); li2.appendChild(ltr(D.address)); ul.appendChild(li2);
+    ul.appendChild(el("li", null, t("strip.demo")));
+    ul.appendChild(el("li", null, t("strip.pay")));
+  }
+
+  function renderAddress() {
+    var a = document.getElementById("visitAddress");
+    a.innerHTML = "";
+    var n = el("span"); n.appendChild(ltr(D.name)); a.appendChild(n);
+    var ad = el("span"); ad.appendChild(ltr(D.address)); a.appendChild(ad);
+    var ph = el("span", "mono"); ph.appendChild(ltr(D.phone)); a.appendChild(ph);
+    var em = el("span", "mono"); em.appendChild(ltr(D.email)); a.appendChild(em);
+  }
+
+  function renderSalon() { renderMenu(); renderHours(); renderStrip(); renderAddress(); }
+
+  /* ---------- Shared chat helpers ---------- */
+  var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, reduceMotion ? 0 : ms); }); }
+  function typingEl() { var e = document.createElement("div"); e.className = "typing"; e.innerHTML = "<i></i><i></i><i></i>"; return e; }
+
+  /* ---------- Live concierge chat (hero) ---------- */
+  var FSI = "⁨", PDI = "⁩"; // isolates the Latin salon name inside Arabic text
+  var CHAT_UI = {
+    en: {
+      title: "Yasmine · Lumière reception", sub: "AI receptionist · replies in seconds",
+      region: "Demo conversation with Yasmine", legend: "Conversation language",
+      log: "Conversation with Yasmine", replies: "Suggested messages", input: "Your message", placeholder: "Ask about prices, or book a time…",
+      limitPlaceholder: "Demo limit reached", send: "Send", you: "You: ", bot: "Yasmine: ",
+      rest: "The demo is resting right now. To see Yasmine live, message or call Hamza, her developer.",
+      limit: "You've reached this demo's message limit. To see Yasmine set up for your own salon, message or call Hamza, her developer.",
+      wa: "WhatsApp", call: "Call",
+      waText: "Hello, I tried Yasmine on the Lumière demo salon website. Could you get in touch?"
+    },
+    fr: {
+      title: "Yasmine · Accueil Lumière", sub: "Réceptionniste IA · répond en quelques secondes",
+      region: "Démo de conversation avec Yasmine", legend: "Langue de la conversation",
+      log: "Conversation avec Yasmine", replies: "Messages suggérés", input: "Votre message", placeholder: "Demandez un tarif ou réservez un créneau…",
+      limitPlaceholder: "Limite de la démo atteinte", send: "Envoyer", you: "Vous : ", bot: "Yasmine : ",
+      rest: "La démo se repose pour le moment. Pour voir Yasmine en direct, écrivez ou appelez Hamza, son développeur.",
+      limit: "Vous avez atteint la limite de messages de cette démo. Pour voir Yasmine configurée pour votre salon, écrivez ou appelez Hamza, son développeur.",
+      wa: "WhatsApp", call: "Appeler",
+      waText: "Bonjour, j'ai essayé Yasmine sur le site du salon de démonstration Lumière. Pouvez-vous me recontacter ?"
+    },
+    es: {
+      title: "Yasmine · Recepción Lumière", sub: "Recepcionista con IA · responde en segundos",
+      region: "Conversación de demostración con Yasmine", legend: "Idioma de la conversación",
+      log: "Conversación con Yasmine", replies: "Mensajes sugeridos", input: "Tu mensaje", placeholder: "Pregunta un precio o reserva una hora…",
+      limitPlaceholder: "Límite de la demo alcanzado", send: "Enviar", you: "Tú: ", bot: "Yasmine: ",
+      rest: "La demo está descansando ahora mismo. Para ver a Yasmine en directo, escribe o llama a Hamza, su desarrollador.",
+      limit: "Has llegado al límite de mensajes de esta demo. Para ver a Yasmine configurada para tu salón, escribe o llama a Hamza, su desarrollador.",
+      wa: "WhatsApp", call: "Llamar",
+      waText: "Hola, he probado Yasmine en la web del salón de demostración Lumière. ¿Podéis contactarme?"
+    },
+    ar: {
+      title: "ياسمين · استقبال " + FSI + "Lumière" + PDI, sub: "موظفة استقبال ذكية · ترد خلال ثوانٍ",
+      region: "تجربة محادثة مع ياسمين", legend: "لغة المحادثة",
+      log: "المحادثة مع ياسمين", replies: "رسائل مقترحة", input: "رسالتك", placeholder: "اسأل عن الأسعار أو احجز موعداً…",
+      limitPlaceholder: "انتهى حد الرسائل في هذا العرض", send: "إرسال", you: "أنت: ", bot: "ياسمين: ",
+      rest: "العرض التجريبي في استراحة الآن. لرؤية ياسمين مباشرة، راسل حمزة، مطوّرها، أو اتصل به.",
+      limit: "وصلت إلى حد الرسائل في هذا العرض. لرؤية ياسمين مهيّأة لصالونك، راسل حمزة، مطوّرها، أو اتصل به.",
+      wa: "واتساب", call: "اتصال",
+      waText: "مرحباً، جربت ياسمين على موقع صالون Lumière التجريبي. هل يمكنكم التواصل معي؟"
+    }
+  };
+  var CHAT_GREETING = {
+    en: "Hello, I'm Yasmine, the receptionist at Lumière Hair & Beauty Studio. I can tell you about our services and prices, or book, change or cancel an appointment. How can I help?",
+    fr: "Bonjour, je suis Yasmine, la réceptionniste de Lumière Hair & Beauty Studio. Je peux vous renseigner sur nos prestations et nos tarifs, ou prendre, déplacer ou annuler un rendez-vous. Que puis-je faire pour vous ?",
+    es: "Hola, soy Yasmine, la recepcionista de Lumière Hair & Beauty Studio. Puedo informarte sobre nuestros servicios y precios, o reservar, cambiar o cancelar una cita. ¿En qué te ayudo?",
+    ar: "مرحباً، أنا ياسمين، موظفة الاستقبال في " + FSI + "Lumière Hair & Beauty Studio" + PDI + ". يمكنني إخبارك عن خدماتنا وأسعارنا، أو حجز موعد أو تغييره أو إلغاؤه. كيف يمكنني مساعدتك؟"
+  };
+  var CHAT_CHIPS = {
+    en: ["I'd like to book a haircut for tomorrow.", "How much does balayage cost?", "Are you open on Saturday?", "I'd like to reschedule my appointment."],
+    fr: ["Bonjour, je voudrais prendre rendez-vous pour une coloration.", "Quels sont vos horaires ?", "Combien coûte un balayage ?"],
+    es: ["Hola, ¿tenéis hora para un corte de pelo mañana?", "¿Cuánto cuesta un balayage?", "¿Qué horario tenéis?"],
+    ar: ["أريد حجز موعد لقص الشعر", "ما هي أوقات العمل؟", "كم سعر البالياج؟"]
+  };
+
+  var liveChat = document.getElementById("liveChat");
+  var chatLog = document.getElementById("chatLog");
+  var chatReplies = document.getElementById("chatReplies");
+  var chatForm = document.getElementById("chatForm");
+  var chatInput = document.getElementById("chatInput");
+  var chatSend = document.getElementById("chatSend");
+  var chatHp = document.getElementById("chatHp");
+  var chatLangInputs = Array.prototype.slice.call(document.querySelectorAll('input[name="chatLang"]'));
+
+  var chatLang = "en";
+  var chatLangPicked = false;
+  var chatStarted = false;
+  var chatGreeted = false;
+  var chatPending = false;
+  var chatSessionMem = null;
+  var chatCountMem = 0;
+
+  function ssGet(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }
+  function ssSet(k, v) { try { sessionStorage.setItem(k, v); } catch (e) {} }
+  function chatSessionId() {
+    if (chatSessionMem) return chatSessionMem;
+    var id = ssGet("lumiere-chat-session");
+    if (!id) {
+      try { id = crypto.randomUUID(); } catch (e) { id = "web-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 12); }
+      ssSet("lumiere-chat-session", id);
+    }
+    chatSessionMem = id;
+    return id;
+  }
+  function chatCount() { return Math.max(chatCountMem, parseInt(ssGet("lumiere-chat-count"), 10) || 0); }
+  function chatBumpCount() { chatCountMem = chatCount() + 1; ssSet("lumiere-chat-count", String(chatCountMem)); }
+  function chatLimitReached() { return chatCount() >= CHAT_MAX_MESSAGES; }
+
+  function ui() { return CHAT_UI[chatLang] || CHAT_UI.en; }
+  function nowTime() { var d = new Date(); return ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2); }
+  function chatScroll() { chatLog.scrollTop = chatLog.scrollHeight; }
+
+  function chatBubble(from, text) {
+    var e = el("div", "msg " + (from === "you" ? "client" : "bot"));
+    e.appendChild(el("span", "sr-only", from === "you" ? ui().you : ui().bot));
+    var p = el("div", "lc-text", text); p.dir = "auto";
+    var time = el("time", null, nowTime()); time.setAttribute("aria-hidden", "true");
+    e.appendChild(p); e.appendChild(time);
+    chatLog.appendChild(e);
+    chatScroll();
+  }
+
+  /* Note with the developer's WhatsApp + call buttons (demo offline, or limit reached) */
+  function chatNote(text) {
+    var u = ui();
+    var e = el("div", "lc-note");
+    e.appendChild(el("p", null, text));
+    var actions = el("div", "lc-actions");
+    var wa = el("a", null, u.wa);
+    wa.href = "https://wa.me/" + WA_NUMBER + "?text=" + encodeURIComponent(u.waText);
+    wa.target = "_blank"; wa.rel = "noopener";
+    var call = el("a", null, u.call);
+    call.href = "tel:+" + WA_NUMBER;
+    actions.appendChild(wa); actions.appendChild(call);
+    e.appendChild(actions);
+    chatLog.appendChild(e);
+    chatScroll();
+  }
+
+  function chatChips(list) {
+    chatReplies.innerHTML = "";
+    (list || []).forEach(function (label) {
+      var b = el("button", "lc-chip", label);
+      b.type = "button"; b.dir = "auto"; b.disabled = chatPending;
+      b.addEventListener("click", function () { chatSendMessage(label); });
+      chatReplies.appendChild(b);
+    });
+  }
+
+  function chatSetPending(p) {
+    chatPending = p;
+    chatSend.disabled = p || chatLimitReached();
+    Array.prototype.forEach.call(chatReplies.querySelectorAll("button"), function (b) { b.disabled = p; });
+  }
+
+  function chatApplyLang() {
+    var u = ui();
+    liveChat.dir = chatLang === "ar" ? "rtl" : "ltr";
+    liveChat.lang = chatLang;
+    liveChat.setAttribute("aria-label", u.region);
+    document.getElementById("chatTitle").textContent = u.title;
+    document.getElementById("chatSub").textContent = u.sub;
+    document.getElementById("chatLegend").textContent = u.legend;
+    document.getElementById("chatInputLabel").textContent = u.input;
+    chatLog.setAttribute("aria-label", u.log);
+    chatReplies.setAttribute("aria-label", u.replies);
+    chatSend.setAttribute("aria-label", u.send);
+    chatInput.placeholder = chatLimitReached() ? u.limitPlaceholder : u.placeholder;
+    chatLangInputs.forEach(function (r) { r.checked = r.value === chatLang; });
+  }
+
+  function chatLockLimit() {
+    chatInput.disabled = true;
+    chatSend.disabled = true;
+    chatChips([]);
+    chatApplyLang();
+    chatNote(ui().limit);
+  }
+
+  function chatGreet() {
+    chatGreeted = true;
+    chatLog.innerHTML = "";
+    chatBubble("bot", CHAT_GREETING[chatLang]);
+    if (chatLimitReached()) chatLockLimit();
+    else chatChips(CHAT_CHIPS[chatLang]);
+  }
+
+  function setChatLang(next) {
+    chatLang = next;
+    chatApplyLang();
+    if (!chatStarted) chatGreet();
+    else if (!chatPending && !chatLimitReached()) chatChips(CHAT_CHIPS[next]);
+  }
+
+  /* The chat follows the site language until the visitor picks one in the chat */
+  function chatFollowSite(siteLang) {
+    if (chatLangPicked) return;
+    var next = LANGS.indexOf(siteLang) >= 0 ? siteLang : "en";
+    if (next !== chatLang) setChatLang(next);
+  }
+
+  /* Resolves to { reply, quickReplies } or null (no URL, error, bad JSON, timeout) */
+  function chatRequest(text) {
+    if (!CHAT_WEBHOOK_URL || typeof fetch !== "function") return sleep(900).then(function () { return null; });
+    var ctrl = typeof AbortController === "function" ? new AbortController() : null;
+    var timer;
+    var timeout = new Promise(function (resolve) {
+      timer = setTimeout(function () { if (ctrl) ctrl.abort(); resolve(null); }, CHAT_TIMEOUT_MS);
+    });
+    var req = fetch(CHAT_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId: chatSessionId(), message: text, lang: chatLang, channel: "web" }),
+      signal: ctrl ? ctrl.signal : undefined
+    }).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d || typeof d.reply !== "string" || !d.reply.trim()) return null;
+        var qr = Array.isArray(d.quickReplies) ? d.quickReplies.filter(function (q) {
+          return typeof q === "string" && q.trim();
+        }).slice(0, 4).map(function (q) { return q.trim().slice(0, 80); }) : [];
+        return { reply: d.reply.trim().slice(0, 2000), quickReplies: qr };
+      })
+      .catch(function () { return null; });
+    return Promise.race([req, timeout]).then(function (res) { clearTimeout(timer); return res; });
+  }
+
+  function chatSendMessage(raw) {
+    if (chatPending || chatLimitReached()) return;
+    var text = String(raw || "").trim().slice(0, CHAT_MAX_CHARS);
+    if (!text) return;
+    chatInput.value = "";
+    if (chatHp.value) return; // honeypot filled: a bot, drop silently
+    chatStarted = true;
+    chatBumpCount();
+    chatBubble("you", text);
+    chatChips([]);
+    chatSetPending(true);
+    var ty = typingEl();
+    ty.setAttribute("aria-hidden", "true");
+    chatLog.appendChild(ty);
+    chatScroll();
+    chatRequest(text).then(function (res) {
+      ty.remove();
+      if (res) {
+        chatBubble("bot", res.reply);
+        chatChips(res.quickReplies);
+      } else {
+        chatNote(ui().rest);
+      }
+      chatSetPending(false);
+      if (chatLimitReached()) chatLockLimit();
+    });
+  }
+
+  chatForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    chatSendMessage(chatInput.value);
+  });
+  chatLangInputs.forEach(function (r) {
+    r.addEventListener("change", function () {
+      if (!r.checked) return;
+      chatLangPicked = true;
+      setChatLang(r.value);
+    });
+  });
+
+  /* ---------- Demo scenarios (WhatsApp look only inside the phone mockup) ---------- */
+  function waveHTML() {
+    var h = [6, 12, 18, 10, 22, 14, 8, 16, 24, 12, 6, 14, 20, 10, 16, 8, 12, 18, 9, 14, 6, 10];
+    return h.map(function (v) { return '<i style="height:' + v + 'px"></i>'; }).join("");
+  }
+  function bubble(m) {
+    var e = document.createElement("div");
+    if (m.from === "system") { e.className = "msg system"; e.textContent = m[lang] || m.en; return e; }
+    e.className = "msg " + m.from;
+    if (m.voice) {
+      e.innerHTML = '<div class="voice"><span class="voice-play"><svg viewBox="0 0 12 12" fill="currentColor"><path d="M2 1l9 5-9 5z"/></svg></span><span class="wave">' + waveHTML() + '</span><span class="voice-len">' + m.voice + "</span></div>";
+    } else {
+      var p = document.createElement("div"); p.dir = "auto"; p.textContent = m.text; e.appendChild(p);
+    }
+    var time = document.createElement("time");
+    time.textContent = m.time + (m.from === "client" ? " ✓✓" : "");
+    e.appendChild(time);
+    return e;
+  }
+  function play(chat, messages) {
+    var run = (chat._run || 0) + 1;
+    chat._run = run;
+    chat.innerHTML = "";
+    var alive = function () { return chat._run === run; };
+    var seq = Promise.resolve();
+    messages.forEach(function (m) {
+      seq = seq.then(function () {
+        if (!alive()) return;
+        if (m.from === "bot") {
+          var ty = typingEl();
+          chat.appendChild(ty);
+          return sleep(1100).then(function () {
+            if (!alive()) return;
+            ty.remove();
+            chat.appendChild(bubble(m));
+            return sleep(900);
+          });
+        }
+        chat.appendChild(bubble(m));
+        return sleep(m.from === "system" ? 700 : 1000);
+      });
+    });
+    return seq.then(function () { return alive(); });
+  }
+
+  var SCENARIOS = {
+    booking: {
+      chips: [{ k: "new", t: { en: "Tomorrow 10:00-11:00", fr: "Demain 10:00-11:00", es: "Mañana 10:00-11:00", ar: "غداً 10:00-11:00" }, l: { en: "Emma Clarke, women's haircut & styling", fr: "Emma Clarke, coupe femme & coiffage", es: "Emma Clarke, corte de mujer y peinado", ar: "إيما كلارك، قص وتصفيف شعر" } }],
+      lang: { en: "English", fr: "Anglais", es: "Inglés", ar: "الإنجليزية" },
+      log: { en: "Appointment added to the calendar: tomorrow 10:00-11:00 (60 min), for Emma Clarke.", fr: "Rendez-vous ajouté à l'agenda : demain 10:00-11:00 (60 min), au nom d'Emma Clarke.", es: "Cita añadida a la agenda: mañana de 10:00 a 11:00 (60 min), a nombre de Emma Clarke.", ar: "أضيف موعد إلى الأجندة: غداً 10:00-11:00 (60 دقيقة)، باسم إيما كلارك." },
+      msgs: [
+        { from: "client", text: "Hi! I'd like to book a haircut for tomorrow.", time: "21:12" },
+        { from: "bot", text: "Hi! A women's haircut & styling takes about an hour. Tomorrow I have 10:00 or 16:30 free. Which suits you best?", time: "21:12" },
+        { from: "client", text: "10am please", time: "21:13" },
+        { from: "bot", text: "Perfect. Could I have your first and last name for the booking?", time: "21:13" },
+        { from: "client", text: "Emma Clarke", time: "21:13" },
+        { from: "bot", text: "All booked. Your haircut is tomorrow at 10:00, Emma. See you then!", time: "21:14" }
+      ]
+    },
+    reschedule: {
+      chips: [{ k: "removed", t: { en: "Thursday 11:00", fr: "Jeudi 11:00", es: "Jueves 11:00", ar: "الخميس 11:00" }, l: { en: "Time freed", fr: "Créneau libéré", es: "Hora liberada", ar: "وقت تحرّر" } }, { k: "new", t: { en: "Saturday 10:30", fr: "Samedi 10:30", es: "Sábado 10:30", ar: "السبت 10:30" }, l: { en: "Blow-dry moved", fr: "Brushing déplacé", es: "Secado cambiado", ar: "موعد التجفيف الجديد" } }],
+      lang: { en: "French", fr: "Français", es: "Francés", ar: "الفرنسية" },
+      log: { en: "Appointment moved in the calendar: from Thursday 11:00 to Saturday 10:30. Thursday's time is free again.", fr: "Rendez-vous déplacé dans l'agenda : de jeudi 11:00 à samedi 10:30. Le créneau de jeudi est de nouveau libre.", es: "Cita cambiada en la agenda: del jueves 11:00 al sábado 10:30. La hora del jueves vuelve a estar libre.", ar: "تم تغيير الموعد في الأجندة: من الخميس 11:00 إلى السبت 10:30. وقت الخميس أصبح شاغراً." },
+      msgs: [
+        { from: "client", text: "Bonsoir, je dois décaler mon brushing de jeudi 11h, j'ai un empêchement", time: "20:05" },
+        { from: "bot", text: "Bonsoir, pas de souci. Je peux vous proposer vendredi à 14:00 ou samedi à 10:30.", time: "20:05" },
+        { from: "client", text: "Samedi 10h30 c'est parfait", time: "20:06" },
+        { from: "bot", text: "C'est fait. Votre brushing est maintenant samedi à 10:30. À samedi !", time: "20:06" }
+      ]
+    },
+    cancel: {
+      chips: [{ k: "removed", t: { en: "Wednesday 15:00", fr: "Mercredi 15:00", es: "Miércoles 15:00", ar: "الأربعاء 15:00" }, l: { en: "Manicure cancelled, time available", fr: "Manucure annulée, créneau disponible", es: "Manicura cancelada, hora disponible", ar: "أُلغي المانيكير، الوقت متاح" } }],
+      lang: { en: "Arabic", fr: "Arabe", es: "Árabe", ar: "العربية" },
+      log: { en: "Wednesday 15:00 manicure removed from the calendar. The time is available again.", fr: "Manucure du mercredi 15:00 retirée de l'agenda. Le créneau est de nouveau disponible.", es: "Manicura del miércoles 15:00 eliminada de la agenda. La hora vuelve a estar disponible.", ar: "حُذف موعد المانيكير يوم الأربعاء 15:00 من الأجندة. الوقت أصبح متاحاً من جديد." },
+      msgs: [
+        { from: "client", text: "مرحباً، أريد إلغاء موعد المانيكير يوم الأربعاء", time: "18:22" },
+        { from: "bot", text: "أهلاً بك. موعدك يوم الأربعاء على الساعة 15:00 (مانيكير). هل تؤكد الإلغاء؟", time: "18:22" },
+        { from: "client", text: "نعم، من فضلك", time: "18:23" },
+        { from: "bot", text: "تم إلغاء الموعد. يسعدنا استقبالك في أي وقت آخر.", time: "18:23" }
+      ]
+    },
+    voice: {
+      chips: [{ k: "new", t: { en: "Saturday 09:00-12:00", fr: "Samedi 09:00-12:00", es: "Sábado 09:00-12:00", ar: "السبت 09:00-12:00" }, l: { en: "Marta Ruiz, balayage (180 min)", fr: "Marta Ruiz, balayage (180 min)", es: "Marta Ruiz, balayage (180 min)", ar: "مارتا رويز، بالياج (180 دقيقة)" } }],
+      lang: { en: "Spanish, voice message", fr: "Espagnol, message vocal", es: "Español, nota de voz", ar: "الإسبانية، رسالة صوتية" },
+      transcript: { en: "What the client said", fr: "Ce que la cliente a dit", es: "Lo que dijo la clienta", ar: "ما قالته العميلة", text: "Hola, quería pedir cita para un balayage el sábado por la mañana, a nombre de Marta Ruiz." },
+      log: { en: "Voice message understood. Balayage booked for Saturday 09:00-12:00, the full 3 hours.", fr: "Message vocal compris. Balayage réservé samedi 09:00-12:00, pour toute la durée de 3 heures.", es: "Nota de voz entendida. Balayage reservado el sábado de 09:00 a 12:00, las 3 horas completas.", ar: "فُهمت الرسالة الصوتية. حُجز البالياج يوم السبت 09:00-12:00، لكامل المدة (3 ساعات)." },
+      msgs: [
+        { from: "client", voice: "0:09", time: "22:51" },
+        { from: "bot", text: "¡Claro, Marta! El balayage dura unas 3 horas. El sábado puedo ofrecerte las 09:00 o las 09:30. ¿Cuál prefieres?", time: "22:51" },
+        { from: "client", text: "A las 9", time: "22:52" },
+        { from: "bot", text: "¡Reservado! Balayage el sábado a las 09:00, Marta. ¡Te esperamos!", time: "22:52" }
+      ]
+    },
+    info: {
+      chips: [],
+      lang: { en: "Spanish", fr: "Espagnol", es: "Español", ar: "الإسبانية" },
+      log: { en: "Answered with the salon's price list and opening hours. No action needed from the team.", fr: "Réponse donnée avec la grille tarifaire et les horaires du salon. Aucune intervention de l'équipe.", es: "Respondido con la lista de precios y el horario del salón. Sin intervención del equipo.", ar: "تم الرد بقائمة أسعار الصالون وأوقات عمله. دون أي تدخل من الفريق." },
+      msgs: [
+        { from: "client", text: "hola! cuanto cuesta el balayage y abris los sabados?", time: "13:02" },
+        { from: "bot", text: "¡Hola! El balayage cuesta desde 140 € y dura unas 3 horas (el precio final depende del largo del pelo). Abrimos de lunes a sábado, de 9:00 a 19:00. ¿Quieres que te busque una cita?", time: "13:02" },
+        { from: "client", text: "genial, gracias 🙏", time: "13:03" },
+        { from: "bot", text: "¡A ti! Cuando quieras, te reservo una hora.", time: "13:03" }
+      ]
+    },
+    urgent: {
+      chips: [{ k: "alert", t: { en: "Salon team", fr: "Équipe du salon", es: "Equipo del salón", ar: "فريق الصالون" }, l: { en: "Alerted on WhatsApp", fr: "Prévenue sur WhatsApp", es: "Avisado por WhatsApp", ar: "تم التنبيه عبر واتساب" } }],
+      lang: { en: "English", fr: "Anglais", es: "Inglés", ar: "الإنجليزية" },
+      log: { en: "Conversation handed over to the salon team, who were alerted on WhatsApp. Yasmine never gives medical or skin-care advice.", fr: "Conversation transmise à l'équipe du salon, prévenue sur WhatsApp. Yasmine ne donne jamais d'avis médical ou dermatologique.", es: "Conversación pasada al equipo del salón, avisado por WhatsApp. Yasmine nunca da consejos médicos ni sobre la piel.", ar: "حُوّلت المحادثة إلى فريق الصالون الذي تم تنبيهه عبر واتساب. ياسمين لا تعطي أي نصيحة طبية أو تتعلق بالبشرة." },
+      msgs: [
+        { from: "client", text: "My scalp has been itchy and red since my colour yesterday. What should I put on it?", time: "02:14" },
+        { from: "bot", text: "I'm sorry to hear that. I can't give medical advice, so I've passed your message to the salon team and a team member will follow up with you personally. If it gets worse, or you notice swelling or trouble breathing, please seek medical help right away.", time: "02:14" },
+        { from: "system", en: "Conversation handed over to the salon team", fr: "Conversation transmise à l'équipe du salon", es: "Conversación pasada al equipo del salón", ar: "حُوّلت المحادثة إلى فريق الصالون" }
+      ]
+    }
+  };
+
+  var demoChat = document.getElementById("demoChat");
+  var panelLang = document.getElementById("panelLang");
+  var panelLog = document.getElementById("panelLog");
+  var panelStatus = document.getElementById("panelStatus");
+  var panelTranscript = document.getElementById("panelTranscript");
+  var panelChips = document.getElementById("panelChips");
+  var currentScenario = null;
+  var panelDone = false;
+
+  function renderChips(s, done) {
+    panelChips.innerHTML = "";
+    if (!done) { panelChips.appendChild(el("span", "chip-none", "–")); return; }
+    if (!s.chips.length) { panelChips.appendChild(el("span", "chip-none", t("panel.none"))); return; }
+    var wrap = el("div", "chips");
+    s.chips.forEach(function (c, i) {
+      var e = el("span", "chip " + c.k);
+      e.style.animationDelay = (i * 0.12) + "s";
+      e.appendChild(el("b", null, c.t[lang]));
+      e.appendChild(el("small", null, c.l[lang]));
+      wrap.appendChild(e);
+    });
+    panelChips.appendChild(wrap);
+  }
+  function renderPanel(key, done) {
+    var s = SCENARIOS[key];
+    panelLang.textContent = s.lang[lang];
+    renderChips(s, done);
+    panelStatus.classList.toggle("done", done);
+    panelLog.textContent = done ? s.log[lang] : t("panel.waiting");
+    if (s.transcript && done) {
+      panelTranscript.hidden = false;
+      panelTranscript.innerHTML = "";
+      panelTranscript.appendChild(el("small", null, s.transcript[lang]));
+      var q = el("div", null, s.transcript.text); q.dir = "auto";
+      panelTranscript.appendChild(q);
+    } else {
+      panelTranscript.hidden = true;
+    }
+  }
+  // The phone is the client's own WhatsApp: its direction follows the client's language, not the website's.
+  var demoPhone = demoChat.closest(".phone");
+  var CLIENT_LANG = { English: "en", French: "fr", Spanish: "es", Arabic: "ar" };
+  function playScenario(key) {
+    currentScenario = key;
+    panelDone = false;
+    var clientLang = CLIENT_LANG[SCENARIOS[key].lang.en] || "en";
+    demoPhone.dir = clientLang === "ar" ? "rtl" : "ltr";
+    demoChat.lang = clientLang;
+    renderPanel(key, false);
+    play(demoChat, SCENARIOS[key].msgs).then(function (ok) {
+      if (ok && currentScenario === key) { panelDone = true; renderPanel(key, true); }
+    });
+  }
+
+  var tabs = Array.prototype.slice.call(document.querySelectorAll(".tab"));
+  tabs.forEach(function (tab, idx) {
+    tab.addEventListener("click", function () {
+      tabs.forEach(function (x) { x.setAttribute("aria-selected", x === tab ? "true" : "false"); x.tabIndex = x === tab ? 0 : -1; });
+      playScenario(tab.getAttribute("data-scenario"));
+    });
+    tab.addEventListener("keydown", function (e) {
+      var dir = document.documentElement.dir === "rtl" ? -1 : 1;
+      var n = null;
+      if (e.key === "ArrowRight") n = idx + dir;
+      if (e.key === "ArrowLeft") n = idx - dir;
+      if (n === null) return;
+      e.preventDefault();
+      var next = tabs[(n + tabs.length) % tabs.length];
+      next.focus();
+      next.click();
+    });
+    tab.tabIndex = idx === 0 ? 0 : -1;
+  });
+
+  function onVisible(target, fn) {
+    if (!("IntersectionObserver" in window)) { fn(); return; }
+    var io = new IntersectionObserver(function (entries) {
+      if (entries[0].isIntersecting) { io.disconnect(); fn(); }
+    }, { threshold: 0.35 });
+    io.observe(target);
+  }
+  onVisible(demoChat, function () { if (!currentScenario) playScenario("booking"); });
+
+  /* ---------- Mobile menu ---------- */
+  var menu = document.getElementById("mobileMenu");
+  var menuOpenBtn = document.getElementById("menuOpen");
+  function openMenu() {
+    menu.hidden = false;
+    menuOpenBtn.setAttribute("aria-expanded", "true");
+    document.body.style.overflow = "hidden";
+    document.getElementById("menuClose").focus();
+  }
+  function closeMenu(restoreFocus) {
+    if (menu.hidden) return;
+    menu.hidden = true;
+    menuOpenBtn.setAttribute("aria-expanded", "false");
+    document.body.style.overflow = "";
+    if (restoreFocus) menuOpenBtn.focus();
+  }
+  menuOpenBtn.addEventListener("click", openMenu);
+  document.getElementById("menuClose").addEventListener("click", function () { closeMenu(true); });
+  menu.querySelectorAll(".mm-nav a").forEach(function (a) { a.addEventListener("click", function () { closeMenu(false); }); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeMenu(true); });
+  window.matchMedia("(min-width: 1061px)").addEventListener("change", function (m) { if (m.matches) closeMenu(false); });
+
+  /* ---------- "Book" / "Ask Yasmine": go to the chat and focus the message box ---------- */
+  document.querySelectorAll(".js-book").forEach(function (a) {
+    a.addEventListener("click", function (e) {
+      e.preventDefault();
+      closeMenu(false);
+      liveChat.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: window.innerWidth <= 760 ? "start" : "center" });
+      setTimeout(function () { if (!chatInput.disabled) chatInput.focus({ preventScroll: true }); }, reduceMotion ? 0 : 450);
+    });
+  });
+
+  /* ---------- Header line + "Ask Yasmine" bar (phones: shown while the chat is off-screen) ---------- */
+  var header = document.querySelector(".site-header");
+  var askBar = document.getElementById("askBar");
+  function onScroll() { header.classList.toggle("scrolled", window.scrollY > 8); }
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+  if ("IntersectionObserver" in window) {
+    new IntersectionObserver(function (entries) {
+      var show = !entries[0].isIntersecting;
+      askBar.classList.toggle("show", show);
+      askBar.setAttribute("aria-hidden", show ? "false" : "true");
+      askBar.tabIndex = show ? 0 : -1;
+    }, { threshold: 0.1 }).observe(liveChat);
+  }
+
+  /* ---------- Privacy link opens the policy ---------- */
+  function openPrivacy() { if (location.hash === "#privacy") document.getElementById("privacy").open = true; }
+  window.addEventListener("hashchange", openPrivacy);
+  openPrivacy();
+
+  /* ---------- Language ---------- */
+  document.documentElement.setAttribute("data-title", document.title);
+  document.querySelectorAll(".lang-btn").forEach(function (b) {
+    b.addEventListener("click", function () { setLang(b.getAttribute("data-lang")); });
+  });
+  var saved = null;
+  try { saved = localStorage.getItem("lumiere-lang"); } catch (e) {}
+  chatApplyLang();
+  if (saved && saved !== "en" && LANGS.indexOf(saved) >= 0) setLang(saved);
+  else { renderSalon(); updateWaLinks(); }
+  if (!chatGreeted) (function () {
+    var ty = typingEl();
+    ty.setAttribute("aria-hidden", "true");
+    chatLog.appendChild(ty);
+    sleep(600).then(function () { if (!chatGreeted) chatGreet(); });
+  })();
+})();
+</script>
+</body>
+</html>

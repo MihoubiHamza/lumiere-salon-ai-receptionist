@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Secrets and environment files - never commit real values.
+# Only the names-only template lumiere.env.example is tracked.
+.env
+.env.*
+*.env
+!lumiere.env.example
+*.pem
+*.key
+credentials*.json
+secrets*.json
+
+# Local tool settings
+.claude/settings.local.json
+
+# OS / editor noise
+Thumbs.db
+desktop.ini
+.DS_Store
+*.log
