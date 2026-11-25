@@ -63,7 +63,7 @@ One thing the files cannot enforce: the salon needs its **own Meta app and Whats
 
 ## Testing the demo
 
-**Automated (no n8n needed):** `cd tests && npm test` runs all 14 suites (235 tests: WhatsApp, tools, concurrency, Messenger, Instagram, appointment authorization, website demo, website page, resource isolation). They run the real workflow JSON in an n8n emulator with a fake Google Calendar and a scripted AI.
+**Automated (no n8n needed):** `cd tests && npm test` runs all 14 suites (253 tests: WhatsApp, tools, concurrency, Messenger, Instagram, appointment authorization, website demo, website page, resource isolation). They run the real workflow JSON in an n8n emulator with a fake Google Calendar and a scripted AI.
 
 **Website (live AI):** follow the test script in `website-demo/README.md`. Use the suggested questions on the chat chips:
 - "Hi! I'd like to book a haircut for tomorrow."

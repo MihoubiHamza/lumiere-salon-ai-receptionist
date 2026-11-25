@@ -1,5 +1,43 @@
 # CHANGELOG — Lumière Hair & Beauty Studio AI Receptionist
 
+## Fixes from the website production test: false fallback after a confirmed change, atomic rate limits (2026-11-25)
+
+Both defects were reproduced by new tests on the previous code before they were fixed. Nothing was imported or published.
+
+**1. False fallback after a successful cancel / move.**
+- **Root cause:** after the server cancelled or moved an appointment on the customer's typed yes, it told the AI in the next turn ("[System log] … the system CANCELLED …"). The AI truthfully repeated it, but `Sanitize AI Output` only accepts a success claim backed by a tool call of the same turn, so it replaced the reply with the technical fallback.
+- **Seen live:** on a duplicate "Yes" and on a late "Yes".
+- **Fix:**
+  - **Structured record.** On a SUCCESS result, Confirmation Output passes a structured record to the chat-lock release. The record holds the confirmation id, action, appointment id, old and new start, service and `res: 'SUCCESS'`.
+  - **Where it is stored.** The engine stores it as `la` in that customer's own lock object. Only the lock holder writes it, stamped with the server time.
+  - **Late or duplicate yes.** When a yes arrives with nothing pending and such a record exists from the last 2 h (`CONFIRM_DONE_MS`, the same window as the [System log]), the Confirmation Gate answers with the server's "That is already done…" text, in four languages. Nothing is executed; the used confirmation id can never run again.
+  - **Server text is not checked as an AI claim.** Text written by the server in the current execution (question, result, "already done") is marked `serverText` and no longer checked as an AI claim.
+  - **AI recaps.** An AI reply that claims a cancel / move the current execution did not do is never passed through. If the record shows that change really happened for this customer, the server's own text is sent instead of the technical error. Without such a record the reply is still rejected exactly as before.
+  - **Failed or declined changes** are never recorded.
+- Shared code: WhatsApp, Messenger and Instagram are rebuilt with the same fix (not deployed).
+
+**2. Rate-limit counters under-counted overlapping requests.**
+- **Root cause:** the counters were in n8n workflow static data. Every execution loads it at its start and writes it back at its end, so overlapping executions overwrote each other's increments.
+- **Reproduced:**
+  - 8 simultaneous requests of one session with limit 3: all 8 allowed;
+  - 9 from one IP with limit 5: all 9 allowed;
+  - 10 visitors with an hourly cap of 6: all 10 allowed;
+  - the daily cap was ignored.
+- **Storage:** Google Calendar lock objects on the Lumière Demo calendar, updated with conditional writes (ETag `If-Match`), the same compare-and-swap the chat lock and the calendar mutex already use. The deployment has no Postgres or Redis, its SQLite database is not reachable from workflows, and static data / Data Tables have no atomic increment.
+- **New engine operation `rateHit`:**
+  - one counter object per session, per IP (salted one-way hashes) and one for the overall hour + day;
+  - each request reads, computes and writes with `If-Match`; a refused write (412) is re-read and recomputed, so no increment is ever lost;
+  - a request is judged on the count it actually committed;
+  - the overall budget is used only by requests within the per-visitor limits;
+  - a store failure or too much contention refuses the request ("busy" notice, no AI call).
+- **Website intake:** validation → `Count Request?` → `Rate Limit: Count` → engine → `Rate Limit Decision` → Safety Gate. Rejected requests are never counted. The first-message notice stays in static data (pseudo-ids only).
+- **Tests:**
+  - website demo: F1-F6 (issue 1) and RL1-RL8 (issue 2, simultaneous independent executions at the limit boundaries, with checks that writes really collided);
+  - engine: U13-U15;
+  - WhatsApp: M1b.
+
+  `npm test`: 14 suites, 253 tests.
+
 ## Website demo: availability questions without a time (2026-11-25)
 
 Found in the production test after the website-demo redeploy:

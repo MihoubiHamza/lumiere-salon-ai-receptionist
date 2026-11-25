@@ -52,6 +52,13 @@ module.exports = {
   CONFIRM_TTL_MS: 600000, // a pending confirmation expires after 10 minutes
   CONFIRM_USED_MAX: 20, // used/cleared confirmation ids remembered per customer (replay protection)
   CONFIRM_NOTES_MAX: 4, // recent system notes shown to the AI
+  // A change the server completed stays recognisable for as long as the AI is told about
+  // it (the [System log] window): a late yes / a truthful recap is answered from it.
+  CONFIRM_DONE_MS: 7200000,
+
+  // Website demo rate-limit counters (atomic conditional writes on lock objects)
+  RATE_MAX_MS: 20000, // give up (and refuse the request) after this long
+  RATE_CAS_MAX: 40, // max conditional-write retries under contention, then refuse
 
   JOURNAL_KEEP_MS: 600000,
   JOURNAL_MAX: 40,

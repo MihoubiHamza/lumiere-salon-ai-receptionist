@@ -938,7 +938,9 @@ function createEngine(CFG, CONF) {
   // What the main workflow needs from this customer's lock object at the start of
   // a message: the pending confirmation (if any), recent system notes and language.
   // lastTs: timestamp of this customer's previous processed message (0 = first contact).
-  const convo = (st) => ({ pending: st.pc || null, notes: st.n || [], lang: st.lg || '', lastTs: st.lp || 0 });
+  // lastAction: the last cancel / reschedule the SERVER completed for this customer after
+  // their typed yes (written at release only on a SUCCESS result - see CR.getR).
+  const convo = (st) => ({ pending: st.pc || null, notes: st.n || [], lang: st.lg || '', lastTs: st.lp || 0, lastAction: st.la || null });
   const qKey = (w) => [w.ts || 0, w.r || 0, w.t];
   function qCmp(a, b) { const x = qKey(a), y = qKey(b); for (let i = 0; i < 3; i++) { if (x[i] < y[i]) return -1; if (x[i] > y[i]) return 1; } return 0; }
 
@@ -1032,6 +1034,14 @@ function createEngine(CFG, CONF) {
       // Confirmation gate bookkeeping decided while handling this message.
       if (ctx.pcClear && st.pc && st.pc.id === ctx.pcClear) { nst.pc = null; nst.pu = usedAdd(st.pu, ctx.pcClear); changed = true; }
       if (ctx.note) { nst.n = notesAdd(st.n, now, ctx.note); changed = true; }
+      // Structured record of a change the server really completed in THIS execution
+      // (confirmation id, action, appointment, times). Only the lock holder writes it,
+      // into this customer's own lock object, stamped with the server time.
+      const la = ctx.la;
+      if (la && typeof la === 'object' && la.res === 'SUCCESS' && (la.act === 'cancel' || la.act === 'reschedule') && la.id && la.ev) {
+        nst.la = { id: String(la.id), act: la.act, ev: String(la.ev), os: Number(la.os) || 0, ns: la.ns == null ? null : Number(la.ns), sum: String(la.sum || '').slice(0, 120), svc: String(la.svc || '').slice(0, 80), res: 'SUCCESS', at: now };
+        changed = true;
+      }
       if (ctx.lang && ctx.lang !== st.lg) { nst.lg = ctx.lang; changed = true; }
     }
     if (!changed) return DONE(s, R('RELEASED', 'nothing to release'));
@@ -1048,8 +1058,78 @@ function createEngine(CFG, CONF) {
     return DONE(s, R('RELEASE_FAILED', 'lease will expire on its own'));
   };
 
+  // ================================================================ RATE LIMIT COUNTERS
+  // Website demo request limits, one counter per lock object (id = prefix + hash; the
+  // object holds only { v, c: { w: window start, n: count } } or the two overall
+  // windows). Every increment is a CONDITIONAL write (If-Match on the object's ETag):
+  // if another execution wrote in between, the write is refused (412) and this one
+  // re-reads and recomputes. So simultaneous requests can never overwrite each other's
+  // increments, and each request is judged on the count it actually committed.
+  //   ctx.counters: [{ id, kind: 'k', max, win }, ...]  (session, IP: always counted)
+  //               + { id, kind: 'g', maxH, maxD }       (overall hour + day, one object:
+  //                 counted only when no 'k' limit was exceeded, refused at the cap)
+  // Results: ALLOWED | LIMITED (a 'k' counter over its max) | BUSY (overall cap) | ERROR.
+  // ERROR (store unavailable) must be treated as "refuse" by the caller (fail closed).
+  const RL_ID = /^[0-9a-v]{8,100}$/;
+  const rlWin = (c, win, now) => (c && typeof c === 'object' && Number.isFinite(c.w) && Number.isFinite(c.n) && now - c.w < win && now >= c.w ? c : { w: now, n: 0 });
+  H['RL.start'] = (s) => {
+    const list = Array.isArray(s.ctx.counters) ? s.ctx.counters : [];
+    const ok = list.length && list.every((c) => c && RL_ID.test(String(c.id)) && (c.kind === 'k' ? c.max > 0 && c.win > 0 : c.kind === 'g' && c.maxH > 0 && c.maxD > 0));
+    if (!ok || list.filter((c) => c.kind === 'g').length > 1 || (list.some((c) => c.kind === 'g') && list[list.length - 1].kind !== 'g')) return DONE(s, R('ERROR', 'rate limit: invalid counters'));
+    s.rl = { i: 0, cas: 0, boots: 0, limited: false, counts: {} };
+    return GOTO(s, 'RL.get');
+  };
+  function rlNext(s) {
+    s.rl.i++; s.rl.cas = 0; s.rl.boots = 0;
+    const c = s.ctx.counters[s.rl.i];
+    if (!c) return DONE(s, R(s.rl.limited ? 'LIMITED' : 'ALLOWED', s.rl.limited ? 'over a per-visitor limit' : 'allowed', { counts: s.rl.counts }));
+    if (c.kind === 'g' && s.rl.limited) return DONE(s, R('LIMITED', 'over a per-visitor limit', { counts: s.rl.counts }));
+    return GOTO(s, 'RL.get');
+  }
+  const rlReq = (method, id, extra) => Object.assign({ method, url: evUrl(CFG.LOCK_CALENDAR_ID, id) }, extra || {});
+  H['RL.get'] = (s) => HTTP(s, 'RL.getR', rlReq('GET', s.ctx.counters[s.rl.i].id));
+  H['RL.getR'] = (s, r, now, rnd) => {
+    const c = cls(r); const k = s.ctx.counters[s.rl.i];
+    if (c === 'notfound') {
+      if (s.rl.boots++ >= 3) return DONE(s, R('ERROR', 'rate limit: could not create counter'));
+      return HTTP(s, 'RL.bootR', { method: 'POST', url: calUrl(CFG.LOCK_CALENDAR_ID), body: lockBody(k.id, 'rate limit counter', { v: 1 }) });
+    }
+    if (c !== 'ok') { if (retryable(c)) { const a = retryOr(s, 'RL', 'RL.get', now, rnd); if (a) return a; } return DONE(s, R('ERROR', 'rate limit: counter store unavailable (' + (r && r.statusCode) + ')')); }
+    s.rt.RL = 0;
+    const ev = body(r); const st = parseLock(ev);
+    let nst;
+    if (k.kind === 'k') {
+      const w = rlWin(st.c, k.win, now);
+      nst = { v: 1, c: { w: w.w, n: w.n + 1 } };
+      s.rl.pend = { key: k.id, n: nst.c.n, over: nst.c.n > k.max };
+    } else {
+      const h = rlWin(st.h, 3600000, now), d = rlWin(st.d, 86400000, now);
+      if (h.n >= k.maxH || d.n >= k.maxD) { s.rl.counts.g = { h: h.n, d: d.n }; return DONE(s, R('BUSY', 'overall budget used', { counts: s.rl.counts })); }
+      nst = { v: 1, h: { w: h.w, n: h.n + 1 }, d: { w: d.w, n: d.n + 1 } };
+      s.rl.pend = { key: 'g', g: { h: nst.h.n, d: nst.d.n } };
+    }
+    return HTTP(s, 'RL.putR', rlReq('PUT', k.id, { headers: { 'If-Match': ev.etag }, body: lockBody(k.id, 'rate limit counter', nst) }));
+  };
+  H['RL.bootR'] = (s, r, now, rnd) => (retryable(cls(r)) ? SLEEP(s, 'RL.get', backoff(0, rnd)) : GOTO(s, 'RL.get'));
+  H['RL.putR'] = (s, r, now, rnd) => {
+    const c = cls(r); const p = s.rl.pend;
+    if (c === 'ok') {
+      if (p.key === 'g') s.rl.counts.g = p.g; else { s.rl.counts[s.ctx.counters[s.rl.i].id] = p.n; if (p.over) s.rl.limited = true; }
+      return rlNext(s);
+    }
+    // Someone else committed first: re-read and recompute on top of their count (never overwrite it).
+    if (c === 'precondition' || c === 'conflict') {
+      if (++s.rl.cas > (CFG.RATE_CAS_MAX || 40) || now > s.deadline) return DONE(s, R('ERROR', 'rate limit: too much contention'));
+      return SLEEP(s, 'RL.get', 20 + rnd() * 120);
+    }
+    // Unclear result: re-read. If our write landed, the next CAS simply counts on top of it
+    // (a possible extra count, never a lost one - the safe direction for a limit).
+    if (retryable(c)) { const a = retryOr(s, 'RLP', 'RL.get', now, rnd); if (a) return a; }
+    return DONE(s, R('ERROR', 'rate limit: could not update counter (' + (r && r.statusCode) + ')'));
+  };
+
   // ================================================================ driver
-  const START = { book: 'B.start', reschedule: 'S.start', cancel: 'C.start', chatAcquire: 'CA.start', chatRelease: 'CR.get' };
+  const START = { book: 'B.start', reschedule: 'S.start', cancel: 'C.start', chatAcquire: 'CA.start', chatRelease: 'CR.get', rateHit: 'RL.start' };
   function init(op, ctx, now, execId, rnd) {
     if (!START[op]) throw new Error('engine: unknown op ' + op);
     const c = ctx || {};
@@ -1057,7 +1137,7 @@ function createEngine(CFG, CONF) {
     return {
       // A cancel/reschedule call carrying a confirmation id is an EXECUTE call (confirmation gate).
       v: 1, op, ctx: c, phase: (op === 'cancel' || op === 'reschedule') && c.confirm_id ? 'X.start' : START[op], step: 0, rt: {}, lists: {},
-      t0: now, deadline: now + (chat ? CFG.CHAT_MAX_WAIT_MS : CFG.OP_DEADLINE_MS),
+      t0: now, deadline: now + (op === 'rateHit' ? (CFG.RATE_MAX_MS || 20000) : chat ? CFG.CHAT_MAX_WAIT_MS : CFG.OP_DEADLINE_MS),
       token: c.token || ('e' + String(execId == null ? '' : execId) + '_' + randId(rnd, '', 8)),
     };
   }

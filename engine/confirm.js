@@ -136,6 +136,8 @@ function createConfirm() {
       expired: (act) => 'That confirmation request has expired, so nothing was changed. If you still want to ' + (act === 'cancel' ? 'cancel' : 'move') + ' your appointment, just tell me again.',
       invalid: (why) => 'I could not complete that change, so nothing was changed (' + why + '). Please tell me again what you would like to do.',
       unknown: 'Sorry, I could not confirm the result of that change. Please ask me "When is my appointment?" in a moment, or contact the salon.',
+      alreadyCancel: (w, a) => 'That is already done: your appointment ' + w + ' on ' + a + ' was cancelled. Nothing else was changed. Would you like to book another time?',
+      alreadyMove: (w, a, b) => 'That is already done: your appointment ' + w + ' is on ' + b + ' (moved from ' + a + '). Nothing else was changed.',
       why: { appointment_changed: 'the appointment changed in the meantime', conflict: 'that new time is no longer free', default: 'the confirmation is no longer valid' },
       chips: { cancel: ['Yes, cancel it', 'No, keep it'], reschedule: ['Yes, move it', 'No, keep it'], afterCancel: ['Book a new appointment', 'Do you have any availability this Saturday?'], after: ['When is my appointment?', 'That\'s all, thank you'] },
     },
@@ -150,6 +152,8 @@ function createConfirm() {
       expired: (act) => 'Cette demande de confirmation a expiré, rien n\'a changé. Si vous souhaitez toujours ' + (act === 'cancel' ? 'annuler' : 'déplacer') + ' votre rendez-vous, redites-le-moi.',
       invalid: (why) => 'Je n\'ai pas pu effectuer ce changement, rien n\'a changé (' + why + '). Redites-moi ce que vous souhaitez faire.',
       unknown: 'Désolée, je n\'ai pas pu vérifier le résultat de ce changement. Demandez-moi « Quand est mon rendez-vous ? » dans un instant, ou contactez le salon.',
+      alreadyCancel: (w, a) => 'C\'est déjà fait : votre rendez-vous ' + w + ' du ' + a + ' a été annulé. Rien d\'autre n\'a changé. Souhaitez-vous prendre un autre rendez-vous ?',
+      alreadyMove: (w, a, b) => 'C\'est déjà fait : votre rendez-vous ' + w + ' est le ' + b + ' (déplacé du ' + a + '). Rien d\'autre n\'a changé.',
       why: { appointment_changed: 'le rendez-vous a changé entre-temps', conflict: 'ce nouvel horaire n\'est plus libre', default: 'la confirmation n\'est plus valable' },
       chips: { cancel: ['Oui, annuler', 'Non, garder'], reschedule: ['Oui, déplacer', 'Non, garder'], afterCancel: ['Prendre un nouveau rendez-vous', 'Avez-vous des disponibilités samedi ?'], after: ['Quand est mon rendez-vous ?', 'C\'est tout, merci'] },
     },
@@ -164,6 +168,8 @@ function createConfirm() {
       expired: (act) => 'Esta solicitud de confirmación ha caducado, así que no se ha tocado nada. Si aún quieres ' + (act === 'cancel' ? 'cancelar' : 'mover') + ' tu cita, dímelo de nuevo.',
       invalid: (why) => 'No he podido hacer ese cambio, así que no se ha tocado nada (' + why + '). Dime de nuevo qué quieres hacer.',
       unknown: 'Perdona, no he podido comprobar el resultado de ese cambio. Pregúntame «¿Cuándo es mi cita?» en un momento, o contacta con el salón.',
+      alreadyCancel: (w, a) => 'Ya está hecho: tu cita ' + w + ' del ' + a + ' fue cancelada. No se ha cambiado nada más. ¿Quieres reservar otra hora?',
+      alreadyMove: (w, a, b) => 'Ya está hecho: tu cita ' + w + ' es el ' + b + ' (movida desde el ' + a + '). No se ha cambiado nada más.',
       why: { appointment_changed: 'la cita ha cambiado entretanto', conflict: 'esa nueva hora ya no está libre', default: 'la confirmación ya no es válida' },
       chips: { cancel: ['Sí, cancelar', 'No, mantener'], reschedule: ['Sí, mover', 'No, mantener'], afterCancel: ['Reservar una nueva cita', '¿Tenéis disponibilidad este sábado?'], after: ['¿Cuándo es mi cita?', 'Eso es todo, gracias'] },
     },
@@ -178,6 +184,8 @@ function createConfirm() {
       expired: (act) => 'انتهت صلاحية طلب التأكيد، لذلك لم يتغير شيء. إذا كنت لا تزال تريد ' + (act === 'cancel' ? 'إلغاء' : 'نقل') + ' موعدك، أخبرني مرة أخرى.',
       invalid: (why) => 'لم أتمكن من إجراء هذا التغيير، لذلك لم يتغير شيء (' + why + '). أخبرني مرة أخرى بما تريد.',
       unknown: 'عذرًا، لم أتمكن من التحقق من نتيجة هذا التغيير. اسألني «متى موعدي؟» بعد قليل، أو تواصل مع الصالون.',
+      alreadyCancel: (w, a) => 'تم ذلك بالفعل: أُلغي موعدك ' + w + ' يوم ' + a + '. لم يتغير شيء آخر. هل تريد حجز موعد آخر؟',
+      alreadyMove: (w, a, b) => 'تم ذلك بالفعل: موعدك ' + w + ' أصبح يوم ' + b + ' (بدلًا من ' + a + '). لم يتغير شيء آخر.',
       why: { appointment_changed: 'تغيّر الموعد في هذه الأثناء', conflict: 'الوقت الجديد لم يعد متاحًا', default: 'التأكيد لم يعد صالحًا' },
       chips: { cancel: ['نعم، ألغِ الموعد', 'لا، أبقِ الموعد'], reschedule: ['نعم، انقل الموعد', 'لا، أبقِ الموعد'], afterCancel: ['حجز موعد جديد', 'هل لديكم مواعيد متاحة يوم السبت؟'], after: ['متى موعدي؟', 'هذا كل شيء، شكرًا'] },
     },
@@ -186,6 +194,11 @@ function createConfirm() {
   function ask(rec, lang, off) {
     const t = texts(lang);
     return rec.act === 'cancel' ? t.askCancel(what(rec), when(rec.os, lang, off)) : t.askMove(what(rec), when(rec.os, lang, off), when(rec.ns, lang, off));
+  }
+  // "Already done" text, rendered ONLY from the server's structured record of a completed change.
+  function already(rec, lang, off) {
+    const t = texts(lang);
+    return rec.act === 'cancel' ? t.alreadyCancel(what(rec), when(rec.os, lang, off)) : t.alreadyMove(what(rec), when(rec.os, lang, off), when(rec.ns, lang, off));
   }
   // Marker the tools append to CONFIRMATION_REQUIRED results so the main workflow can show
   // the exact pending request without another calendar read (no braces: survives any wrapping).
@@ -198,6 +211,6 @@ function createConfirm() {
   }
   // The part of a pending record that may leave the lock object (no identity key).
   const pub = (rec) => (rec ? { id: rec.id, act: rec.act, ev: rec.ev, os: rec.os, oe: rec.oe, ns: rec.ns || null, ne: rec.ne || null, sum: rec.sum || '', svc: rec.svc || '', at: rec.at, exp: rec.exp } : null);
-  return { classify, normalize, detectLang, when, what, texts, ask, mark, unmark, pub };
+  return { classify, normalize, detectLang, when, what, texts, ask, already, mark, unmark, pub };
 }
 if (typeof module !== 'undefined' && module.exports) module.exports = { createConfirm };

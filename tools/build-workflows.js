@@ -379,15 +379,16 @@ if (!token) { try { const s = $('Engine: Decide').first().json.__engine.state; i
 // Confirmation gate bookkeeping for this message: drop/used pending request, system note, language.
 let g = {};
 try { if ($('Confirmation Output').isExecuted) g = $('Confirmation Output').first().json; else if ($('Confirmation Gate').isExecuted) g = $('Confirmation Gate').first().json; } catch (e) { g = {}; }
+// la: structured record of a change the server completed in THIS execution (Confirmation Output, SUCCESS only).
 return [{ json: { __engineStart: { op: 'chatRelease', ctx: { chatId: d.customerKey || d.chatId, msgId: d.messageId, msgTs: d.msgTs || 0, token: token || 'e' + $execution.id, wasHolder,
-  pcClear: g.pcClear || '', note: g.note || '', lang: g.detectedLang || '' } } } }];
+  pcClear: g.pcClear || '', note: g.note || '', lang: g.detectedLang || '', la: g.la || null } } } }];
 `;
 const ACQUIRED_CODE = BANNER + `const j = $input.first().json;
 const r = j.result || {};
 const token = (j.__engine && j.__engine.state && j.__engine.state.token) || '';
 // pending / notes / lang come from this customer's lock object (confirmation gate);
 // lastTs = timestamp of the customer's previous processed message (0 = first contact).
-return [{ json: { acquired: true, token, outOfOrder: !!r.outOfOrder, recoveredStaleLock: !!r.recoveredStaleLock, pending: r.pending || null, notes: r.notes || [], lang: r.lang || '', lastTs: r.lastTs || 0 } }];
+return [{ json: { acquired: true, token, outOfOrder: !!r.outOfOrder, recoveredStaleLock: !!r.recoveredStaleLock, pending: r.pending || null, notes: r.notes || [], lang: r.lang || '', lastTs: r.lastTs || 0, lastAction: r.lastAction || null } }];
 `;
 
 // ------------------------------------------------------------------ confirmation gate (main workflows)
@@ -418,7 +419,15 @@ const T = C.texts(lang);
 let viaVoice = false;
 try { viaVoice = $('Merge Voice Text').isExecuted === true; } catch (e) { viaVoice = false; } // the website has no voice path
 let route = 'ai', reply = '', pcClear = '', note = '', aiNote = '', exec = null, ui = null;
-if (p) {
+// The last change the SERVER completed for this customer (structured record in this customer's own
+// lock object, written only on a SUCCESS result, see engine CR.getR), while the AI is still told about it.
+const la = lk.lastAction;
+const recent = la && la.res === 'SUCCESS' && (la.act === 'cancel' || la.act === 'reschedule') && la.id && la.ev && Number.isFinite(la.at) && now - la.at >= 0 && now - la.at < ${CFG.CONFIRM_DONE_MS} ? la : null;
+if (!p && recent && C.classify(userText) === 'yes') {
+  // A duplicate or late "yes" for a change that is already done: answered by the server from the
+  // record. Nothing is executed (no pending request exists; the used id can never run again).
+  route = 'reply'; reply = C.already(recent, lang, OFF); ui = { type: 'done', act: recent.act };
+} else if (p) {
   const verdict = C.classify(userText); // the customer's own words, never the AI
   const what = (p.act === 'cancel' ? 'cancelling' : 'moving') + ' "' + (p.sum || 'the appointment') + '"';
   if (!(now < p.exp)) {
@@ -446,7 +455,7 @@ const log = (lk.notes || []).filter((n) => n && n.at > now - 2 * 3600000).map((n
 const lines = [];
 if (log.length) lines.push('[System log - authoritative, newer than your memory: ' + log.join(' | ') + '.]');
 if (aiNote) lines.push('[System note: ' + aiNote + ']');
-return [{ json: { userText, route, reply, pcClear, note, lang, detectedLang: detected, exec, ui, pending: p ? C.pub(p) : null, aiNote: lines.join('\\n') } }];
+return [{ json: { userText, route, reply, pcClear, note, lang, detectedLang: detected, exec, ui, pending: p ? C.pub(p) : null, recent, aiNote: lines.join('\\n') } }];
 `;
 const OUTPUT_CODE = () => CBANNER + confirmSource() + `
 const C = createConfirm();
@@ -456,6 +465,9 @@ const j = $input.first().json || {};
 const lang = g.lang || 'en';
 const T = C.texts(lang);
 let output = '', steps = [], ui = g.ui || null, note = g.note || '', pcClear = g.pcClear || '';
+// serverText: the reply is written by the server in THIS execution (never AI text) - Sanitize must not
+// treat it as an AI claim. la: structured result of a change the server completed in THIS execution.
+let serverText = g.route !== 'ai', la = null;
 if (g.route === 'ai') {
   output = String(j.output == null ? '' : j.output);
   steps = Array.isArray(j.intermediateSteps) ? j.intermediateSteps : [];
@@ -467,7 +479,7 @@ if (g.route === 'ai') {
     const o = typeof s.observation === 'string' ? s.observation : JSON.stringify(s.observation || '');
     if (/CONFIRMATION_REQUIRED/.test(o)) { const m = C.unmark(o); if (m && m.id) prop = m; }
   }
-  if (prop) { output = C.ask(prop, lang, OFF); ui = { type: 'ask', act: prop.act }; }
+  if (prop) { output = C.ask(prop, lang, OFF); ui = { type: 'ask', act: prop.act }; serverText = true; }
 } else if (g.route === 'cancel' || g.route === 'reschedule') {
   const r = String((j && j.result) == null ? '' : j.result);
   const p = g.pending || {}; const act = g.route;
@@ -478,6 +490,8 @@ if (g.route === 'ai') {
     steps = [{ action: { tool: act === 'cancel' ? 'Cancel_Appointment' : 'Reschedule_Appointment' }, observation: r }]; // the tool really ran and returned SUCCESS
     ui = { type: 'done', act };
     note = 'the customer confirmed and the system ' + (act === 'cancel' ? 'CANCELLED ' + what : 'MOVED ' + what + ' to the new time') + ' - this is done';
+    // Only here - the execution workflow returned SUCCESS for THIS confirmation id in THIS execution.
+    la = { id: p.id, act, ev: p.ev, os: p.os, ns: act === 'reschedule' ? p.ns : null, sum: p.sum || '', svc: p.svc || '', res: 'SUCCESS' };
   } else if (/^CONFIRMATION_INVALID/.test(r)) {
     const why = (/\\(([a-z_]+)\\)/.exec(r) || [])[1] || 'default';
     output = why === 'expired' ? T.expired(act) : T.invalid(T.why[why] || T.why.default);
@@ -489,7 +503,11 @@ if (g.route === 'ai') {
   output = String(g.reply || '');
 }
 if (ui) ui.chips = ui.type === 'ask' ? T.chips[ui.act] : (ui.type === 'done' && ui.act === 'cancel') ? T.chips.afterCancel : T.chips.after;
-return [{ json: { output, intermediateSteps: steps, ui, note, pcClear, lang, detectedLang: g.detectedLang || '' } }];
+// For an AI reply: the server's own text about a change it really completed for this customer
+// (structured record, see the Confirmation Gate). Sanitize uses it INSTEAD of an AI claim it cannot
+// verify in this execution - the AI's words are never passed through.
+const recentText = !serverText && g.recent ? C.already(g.recent, lang, OFF) : '';
+return [{ json: { output, intermediateSteps: steps, ui, note, pcClear, lang, detectedLang: g.detectedLang || '', serverText, la, recentAct: recentText ? g.recent.act : '', recentText } }];
 `;
 // Inputs of the Execute calls: only server-side values, never the AI.
 function confirmExecNode(name, wfId, fields, pos) {
@@ -601,6 +619,22 @@ function addToolField(tool, id, expr) {
 
 const RESULT_CODES = ' Other possible results: OUTSIDE_HOURS / CLOSED_DAY / PAST_TIME (nothing done - ask for a valid time), BUSY_RETRY (system momentarily busy, nothing done - call this tool again ONCE with the same details), ERROR or ERROR_NEEDS_STAFF (nothing confirmed - never claim success; apologize and call Escalate_to_Staff).';
 
+// Inserted into Sanitize AI Output (found live 2026-11-25: after the server cancelled / moved an
+// appointment, the next AI reply truthfully repeated it and was replaced by the technical fallback).
+const SANITIZE_SERVER_RESULTS = `// Text written by the SERVER in this execution (Confirmation Output: the Yes/No question, the
+// result of a confirmed change, "already done") is never an AI claim - it is not checked as one.
+// An AI reply claiming a cancel / move that THIS execution did not do is never passed through:
+// if the server really completed that change for this customer (structured record from the
+// customer's own lock object, see the Confirmation Gate), the customer gets the server's own text
+// about it instead of a technical error; otherwise the reply stays rejected as before.
+let usedServerRecord = false;
+if (item.serverText === true && rawOutput.trim()) { isCorrupted = false; reason = ''; }
+else if (isCorrupted && typeof item.recentText === 'string' && item.recentText) {
+  const m = /^claimed (Cancel|Reschedule)_Appointment succeeded but that tool was never called$/.exec(reason);
+  if (m && (m[1] === 'Cancel' ? 'cancel' : 'reschedule') === item.recentAct) { isCorrupted = false; reason = ''; usedServerRecord = true; }
+}
+
+`;
 const LOCK_FAILED = 'Lock Step Failed - Before Release?';
 function buildMain(wf) {
   // Dedup runs exactly once per execution, so .first() is unambiguous. .item
@@ -624,6 +658,9 @@ function buildMain(wf) {
   const sn = must(wf, 'Sanitize AI Output');
   sn.parameters.jsCode = replaceOnce(sn.parameters.jsCode, "const chatId = $('Dedup & Filter Prep').first().json.chatId;\n",
     "const chatId = $('Dedup & Filter Prep').first().json.customerKey || $('Dedup & Filter Prep').first().json.chatId;\n", 'sanitize counter key');
+  // Server-written text and server-completed changes (Confirmation Output, structured fields).
+  sn.parameters.jsCode = replaceOnce(sn.parameters.jsCode, '// --- CONSECUTIVE ERROR TRACKING & FORCE PAUSE ---\n', SANITIZE_SERVER_RESULTS + '// --- CONSECUTIVE ERROR TRACKING & FORCE PAUSE ---\n', 'sanitize server results');
+  sn.parameters.jsCode = replaceOnce(sn.parameters.jsCode, 'let finalOutput = rawOutput;\n', 'let finalOutput = usedServerRecord ? item.recentText : rawOutput;\n', 'sanitize server record output');
 
   const base = [-9104, 4400];
   upsert(wf, { parameters: { jsCode: ACQUIRE_CODE }, name: 'Chat Lock: Acquire', type: 'n8n-nodes-base.code', typeVersion: 2, position: base });

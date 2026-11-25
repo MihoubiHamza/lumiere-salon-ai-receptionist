@@ -226,6 +226,32 @@ test('M1 WhatsApp: the AI saying "cancelled" is replaced by the server question;
   assert.ok(/System log - authoritative.*CANCELLED "Sara - Manicure"/.test(env.rec.ai.slice(-1)[0].prompt), env.rec.ai.slice(-1)[0].prompt);
 });
 
+test('M1b WhatsApp: after a confirmed cancellation, a late "Sí" and a truthful AI recap get the server text - never the fallback, never a second change', async () => {
+  const env = makeEnv({ seed: 605 });
+  seedAppt(env, 'apptone1', A, DAY, '10:00', 'Sara - Manicure');
+  aiProposesCancel(env, 'OK');
+  await chat(env, 'Quiero cancelar mi cita del martes a las 10:00');
+  env.ai.behave = () => { throw new Error('the AI must not decide a confirmation'); };
+  await chat(env, 'Sí');
+  assert.strictEqual(apptTime(env, 'apptone1'), 'cancelled');
+  const execs = () => env.rec.toolResults.filter((t) => t.inputs && t.inputs.confirm_id).length;
+  const before = execs();
+  await chat(env, 'sí');
+  const late = sendsTo(env, A).slice(-1)[0];
+  assert.ok(/^Ya está hecho: tu cita .* fue cancelada\./.test(late), 'late yes: ' + late);
+  env.ai.behave = () => ({ output: 'Tu cita ha sido cancelada. ¿Algo más?' }); // true, but not done in THIS turn
+  await chat(env, 'gracias');
+  const recap = sendsTo(env, A).slice(-1)[0];
+  assert.ok(/^Ya está hecho: tu cita .* fue cancelada\./.test(recap), 'recap answered from the server record: ' + recap);
+  assert.strictEqual(execs(), before, 'nothing was executed again');
+  // The same AI claim with NO completed change is still rejected (safety check unchanged).
+  const env2 = makeEnv({ seed: 606 });
+  seedAppt(env2, 'apptone1', A, DAY, '10:00', 'Sara - Manicure');
+  env2.ai.behave = () => ({ output: 'Tu cita ha sido cancelada. ¿Algo más?' });
+  await one(env2, () => deliver(env2, waMessage(env2, A, { text: 'cancela mi cita' })));
+  assert.ok(!/cancelada/.test(sendsTo(env2, A).slice(-1)[0]) && apptTime(env2, 'apptone1') === DAY + 'T10:00', sendsTo(env2, A).slice(-1)[0]);
+});
+
 test('M2 WhatsApp: "no" keeps the appointment; a later "yes" confirms nothing', async () => {
   const env = makeEnv({ seed: 610 });
   seedAppt(env, 'apptone1', A, DAY, '10:00', 'Sara - Manicure');

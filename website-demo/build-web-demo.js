@@ -60,6 +60,8 @@ const MAIN_TIMEOUT_S = 120;
 // Engine tuning stays exactly as in the WhatsApp workflows; only the lock ids are
 // the demo's own. Salon values (calendar, hours, timezone...) are NOT here:
 // they come from DEMO CONFIG at runtime.
+// Lock-object id prefix of the atomic rate-limit counters (base32hex only, like the other lock ids).
+const RATE_PREFIX = 'lumdemorl';
 const CLINIC_KEYS = ['CALENDAR_ID', 'CALENDAR_NAME', 'LOCK_CALENDAR_ID', 'TIMEZONE', 'TZ_OFFSET_MIN', 'WORK_START', 'WORK_END', 'CLOSED_WEEKDAY', 'APPT_DEFAULT_MIN'];
 const ENGINE_LITERAL = (() => {
   const o = {};
@@ -291,38 +293,46 @@ if (message.length > L.MAX_MESSAGE_CHARS) return reject(413, 'message too long')
 const h = sha256Hex('session:' + sessionId);
 const pid = '9' + String(parseInt(h.slice(0, 12), 16) % 1e14).padStart(14, '0');
 
-const store = $getWorkflowStaticData('global');
-const rl = store.rl = store.rl || { s: {}, i: {}, seen: {} };
-const HOUR = 3600000;
-const prune = (map, maxAge, cap) => {
-  for (const k of Object.keys(map)) if (now - (map[k].w || map[k]) > maxAge) delete map[k];
-  const keys = Object.keys(map);
-  if (keys.length > cap) keys.sort((a, b) => (map[a].w || map[a]) - (map[b].w || map[b])).slice(0, keys.length - cap).forEach((k) => delete map[k]);
-};
-prune(rl.s, HOUR, 5000); prune(rl.i, HOUR, 5000); prune(rl.seen, 24 * HOUR, 5000);
-const hit = (map, key, max) => {
-  const e = map[key] && now - map[key].w < HOUR ? map[key] : (map[key] = { w: now, n: 0 });
-  e.n++;
-  return e.n > max;
-};
+// Rate limits are counted ATOMICALLY by the engine (op 'rateHit', next nodes): one counter object
+// for this session, one for the client IP (salted one-way hash) and one for the overall budget,
+// each updated with a CONDITIONAL write on the demo calendar (see engine/engine.js, RATE LIMIT
+// COUNTERS). Workflow static data is NOT used for counting: every execution loads it at its
+// start and writes it back at its end, so overlapping executions overwrote each other's
+// increments and parallel requests got past the limits (found live 2026-11-25).
 // Client IP: the LAST X-Forwarded-For entry is the one the proxy in front of n8n
 // (ngrok / a tunnel) appends; earlier entries, x-real-ip and cf-connecting-ip can
 // be written by the client itself (cf-connecting-ip is trusted only behind Cloudflare).
 const xff = String(headers['x-forwarded-for'] || '').split(',').map((x) => x.trim()).filter(Boolean);
 const ipRaw = String((L.TRUST_CF_CONNECTING_IP && headers['cf-connecting-ip']) || xff[xff.length - 1] || headers['x-real-ip'] || '').trim();
-const ipLimited = ipRaw ? hit(rl.i, sha256Hex(C.hashSalt + '|ip|' + ipRaw).slice(0, 20), L.IP_MSGS_PER_HOUR) : false;
-const sessionLimited = hit(rl.s, pid, L.SESSION_MSGS_PER_HOUR);
-const T = C.texts[lang];
-if (sessionLimited || ipLimited) return out({ route: 'notice', reply: T.rateLimited, quickReplies: [] });
-// Overall budget across all visitors (counts only messages that would reach the AI).
-const g = rl.g = rl.g || {};
-const span = (key, len) => (g[key] && now - g[key].w < len ? g[key] : (g[key] = { w: now, n: 0 }));
-const gh = span('h', HOUR), gd = span('d', 24 * HOUR);
-if (gh.n >= L.GLOBAL_MSGS_PER_HOUR || gd.n >= L.GLOBAL_MSGS_PER_DAY) return out({ route: 'notice', reply: T.busy, quickReplies: [] });
-gh.n++; gd.n++;
-const isFirst = !rl.seen[pid];
-if (isFirst) rl.seen[pid] = now;
-return out({ route: 'ok', pid, lang, message, isFirst });
+const HOUR = 3600000, RL = '${RATE_PREFIX}';
+const hk = (x) => sha256Hex(C.hashSalt + x).slice(0, 24); // one-way, salted: no IP or session id is ever stored
+const counters = [{ id: RL + 's' + hk('|s|' + pid), kind: 'k', max: L.SESSION_MSGS_PER_HOUR, win: HOUR }];
+if (ipRaw) counters.push({ id: RL + 'i' + hk('|ip|' + ipRaw), kind: 'k', max: L.IP_MSGS_PER_HOUR, win: HOUR });
+counters.push({ id: RL + 'g01', kind: 'g', maxH: L.GLOBAL_MSGS_PER_HOUR, maxD: L.GLOBAL_MSGS_PER_DAY });
+return out({ route: 'count', pid, lang, message, counters });
+`;
+
+// Starts the engine's atomic rate-limit operation for this request.
+const RATE_START_CODE = `const v = $input.first().json;
+return [{ json: { __engineStart: { op: 'rateHit', ctx: { counters: v.counters } } } }];
+`;
+// Turns the engine's committed counts into the intake result. A counter-store failure, too much
+// contention or any unclear result REFUSES the request (fail closed: no AI call).
+const RATE_DECISION_CODE = `const v = $('Validate & Rate Limit').first().json;
+const r = ($input.first().json || {}).result || {};
+const T = $('DEMO CONFIG').first().json.texts[v.lang];
+if (r.status === 'LIMITED') return [{ json: { route: 'notice', reply: T.rateLimited, quickReplies: [] } }];
+if (r.status !== 'ALLOWED') return [{ json: { route: 'notice', reply: T.busy, quickReplies: [] } }];
+// The first-message notice is not a limit: it stays in static data (pseudo-IDs only, pruned after 24 h).
+const store = $getWorkflowStaticData('global');
+const rl = store.rl = store.rl || {};
+delete rl.s; delete rl.i; delete rl.g; // the old (non-atomic) counters
+const seen = rl.seen = rl.seen || {};
+const now = Date.now();
+for (const k of Object.keys(seen)) if (now - seen[k] > 24 * 3600000) delete seen[k];
+const isFirst = !seen[v.pid];
+if (isFirst) seen[v.pid] = now;
+return [{ json: { route: 'ok', pid: v.pid, lang: v.lang, message: v.message, isFirst } }];
 `;
 
 const SAFETY_CODE = `// Health questions (e.g. an allergic reaction after a colour) and requests for
@@ -585,6 +595,16 @@ function buildMain() {
   put(wf, { parameters: { jsCode: CONFIG_CODE }, name: 'DEMO CONFIG', type: 'n8n-nodes-base.code', typeVersion: 2, position: [dx - 1568, dy + 240] });
   put(wf, boolIf('Website Message?', 'demo-is-web', "={{ $('Website Webhook').isExecuted }}", [dx - 1344, dy + 240]));
   put(wf, { parameters: { jsCode: VALIDATE_CODE }, name: 'Validate & Rate Limit', type: 'n8n-nodes-base.code', typeVersion: 2, position: [dx - 1120, dy] });
+  // Atomic rate-limit counting through the engine loop (op rateHit), then the decision.
+  put(wf, boolIf('Count Request?', 'demo-count', "={{ $json.route === 'count' }}", [dx - 1120, dy - 220]));
+  put(wf, { parameters: { jsCode: RATE_START_CODE }, name: 'Rate Limit: Count', type: 'n8n-nodes-base.code', typeVersion: 2, position: [dx - 1120, dy - 440], onError: 'continueErrorOutput' });
+  put(wf, { parameters: { jsCode: RATE_DECISION_CODE }, name: 'Rate Limit Decision', type: 'n8n-nodes-base.code', typeVersion: 2, position: [dx - 896, dy - 440] });
+  const router = must(wf, 'Engine: Done Router').parameters.rules.values;
+  if (!router.some((r) => r.outputKey === 'rate counted')) {
+    router.push({ conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict', version: 2 },
+      conditions: [{ id: 'rl-done', leftValue: "={{ $json.result.op === 'rateHit' }}", rightValue: '', operator: { type: 'boolean', operation: 'true', singleValue: true } }], combinator: 'and' },
+    renameOutput: true, outputKey: 'rate counted' });
+  }
   put(wf, { parameters: { jsCode: SAFETY_CODE }, name: 'Safety Gate', type: 'n8n-nodes-base.code', typeVersion: 2, position: [dx - 896, dy] });
   put(wf, { parameters: { rules: { values: [routeRule('route-ok', 'ok'), routeRule('route-notice', 'notice'), routeRule('route-reject', 'reject')] }, options: {} },
     name: 'Route Request', type: 'n8n-nodes-base.switch', typeVersion: 3.2, position: [dx - 672, dy] });
@@ -632,13 +652,16 @@ function buildMain() {
   conn(wf, 'Daily Cleanup (03:00)', [['DEMO CONFIG']]);
   conn(wf, 'DEMO CONFIG', [['Website Message?']]);
   conn(wf, 'Website Message?', [['Validate & Rate Limit'], ['List Demo Events']]);
-  conn(wf, 'Validate & Rate Limit', [['Safety Gate']]);
+  conn(wf, 'Validate & Rate Limit', [['Count Request?']]);
+  conn(wf, 'Count Request?', [['Rate Limit: Count'], ['Safety Gate']]); // rejected requests are never counted
+  conn(wf, 'Rate Limit: Count', [['Engine: Decide'], ['Lock Step Failed - Before Release?']]);
+  conn(wf, 'Rate Limit Decision', [['Safety Gate']]);
   conn(wf, 'Safety Gate', [['Route Request']]);
   conn(wf, 'Route Request', [['Dedup & Filter Prep'], ['Respond: Notice'], ['Respond: Rejected']]);
   conn(wf, 'Dedup & Filter Prep', [['Chat Lock: Acquire']]);
   conn(wf, 'List Demo Events', [['Pick Old Demo Events']]);
   conn(wf, 'Pick Old Demo Events', [['Delete Demo Event']]);
-  conn(wf, 'Engine: Done Router', [['Chat Lock Acquired'], ['Respond: Fallback'], ['Respond: Fallback'], ['Chat Lock Released']]);
+  conn(wf, 'Engine: Done Router', [['Chat Lock Acquired'], ['Respond: Fallback'], ['Respond: Fallback'], ['Chat Lock Released'], ['Rate Limit Decision']]);
   conn(wf, 'Chat Lock Acquired', [['Merge Text Message'], ['Respond: Fallback']]);
   // Confirmation gate (built in the WhatsApp workflow): demo tool workflows + demo config, website fallback.
   for (const [node, key] of [['Run Confirmed Cancel', 'cancel'], ['Run Confirmed Reschedule', 'reschedule']]) {

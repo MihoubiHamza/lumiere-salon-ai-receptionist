@@ -191,4 +191,70 @@ test('U12 Book writes the owner field per channel: WhatsApp unchanged ("Phone:")
   assert.deepStrictEqual(d, ['Customer: ' + IGK + '. Notes: Lina', 'Phone: 213555123456. Notes: Lina', 'Phone: 213555123456. Notes: Lina']);
 });
 
+// ---------------------------------------------------------------- 2026-11-25: atomic counters, completed-action record
+// Drives the real engine against the fake Google Calendar, like the Engine nodes do in n8n.
+async function drive(env, op, ctx, execId) {
+  const eng = createEngine(CFG);
+  const rnd = () => env.sim.rand(0, 1);
+  let s = eng.init(op, ctx, env.sim.now, execId, rnd), resp = null;
+  for (let i = 0; i < 5000; i++) {
+    const { state, action } = eng.step(s, resp, env.sim.now, rnd); s = state; resp = null;
+    if (action.type === 'done') return action.result;
+    if (action.type === 'http') resp = await env.cal.request(action.req);
+    else if (action.type === 'sleep') await env.sim.sleep(action.ms);
+  }
+  throw new Error('engine did not finish');
+}
+const RLK = (n, extra) => Object.assign({ id: 'lumtestrls' + n, kind: 'k', max: 5, win: 3600000 }, extra);
+const RLG = (h, d) => ({ id: 'lumtestrlg01', kind: 'g', maxH: h, maxD: d });
+
+test('U13 rateHit: 12 independent simultaneous runs on one counter (limit 5) -> exactly 5 ALLOWED, all 12 increments kept', async () => {
+  const env = H.makeEnv({ seed: 911 });
+  const rs = await H.runAll(env, Array.from({ length: 12 }, (_, i) => () => drive(env, 'rateHit', { counters: [RLK('a'), RLG(100, 1000)] }, 'x' + i)));
+  assert.deepStrictEqual([rs.filter((r) => r.status === 'ALLOWED').length, rs.filter((r) => r.status === 'LIMITED').length], [5, 7]);
+  assert.strictEqual(env.cal.lockState(CFG.LOCK_CALENDAR_ID, 'lumtestrlsa').c.n, 12, 'no lost increment');
+  assert.strictEqual(env.cal.lockState(CFG.LOCK_CALENDAR_ID, 'lumtestrlg01').h.n, 5, 'only allowed requests used the overall budget');
+  assert.ok(env.cal.log.some((x) => x.method === 'PUT' && x.status === 412), 'conditional writes collided and were retried');
+  assert.deepStrictEqual(env.cal.violations, []);
+});
+
+test('U14 rateHit: overall hour/day caps at the boundary, window reset, bad input and store failure fail closed', async () => {
+  const env = H.makeEnv({ seed: 912 });
+  const g = await H.runAll(env, Array.from({ length: 7 }, (_, i) => () => drive(env, 'rateHit', { counters: [RLK('u' + i), RLG(4, 6)] }, 'g' + i)));
+  assert.deepStrictEqual([g.filter((r) => r.status === 'ALLOWED').length, g.filter((r) => r.status === 'BUSY').length], [4, 3], 'hour cap 4');
+  env.sim.now += 3600001;
+  const g2 = await H.runAll(env, Array.from({ length: 4 }, (_, i) => () => drive(env, 'rateHit', { counters: [RLK('v' + i), RLG(4, 6)] }, 'h' + i)));
+  assert.strictEqual(g2.filter((r) => r.status === 'ALLOWED').length, 2, 'new hour, but the day cap 6 leaves 2');
+  for (const bad of [[], [{ id: 'BAD ID', kind: 'k', max: 1, win: 1 }], [RLG(1, 1), RLK('z')], [RLK('y', { max: 0 })]]) {
+    const [r] = await H.runAll(env, [() => drive(env, 'rateHit', { counters: bad }, 'bad')]);
+    assert.strictEqual(r.status, 'ERROR', JSON.stringify(bad));
+  }
+  const f = H.makeEnv({ seed: 913, cal: { fault: (req) => (/lumtestrl/.test(req.url || '') ? { kind: '503' } : null) } });
+  const [e] = await H.runAll(f, [() => drive(f, 'rateHit', { counters: [RLK('q'), RLG(9, 9)] }, 'f')]);
+  assert.strictEqual(e.status, 'ERROR', 'store failure -> ERROR (the caller refuses the request)');
+});
+
+test('U15 completed-action record: written only by the lock holder, only for a SUCCESS record, read back on the next acquire', async () => {
+  const env = H.makeEnv({ seed: 914 });
+  const chat = 'ig:17841400000000001:5512345678901234', lockId = E.chatLockId(chat);
+  const la = { id: 'cfabc', act: 'cancel', ev: 'ev1', os: Date.parse('2026-10-06T09:00:00Z'), ns: null, sum: 'Lina - Manicure', svc: 'Manicure', res: 'SUCCESS' };
+  const turn = async (msgId, extra) => {
+    const [a] = await H.runAll(env, [() => drive(env, 'chatAcquire', { chatId: chat, msgId, msgTs: env.sim.now, token: 't' + msgId }, msgId)]);
+    await H.runAll(env, [() => drive(env, 'chatRelease', Object.assign({ chatId: chat, msgId, msgTs: env.sim.now, token: 't' + msgId, wasHolder: true }, extra), msgId)]);
+    return a;
+  };
+  await turn('m1', { la: Object.assign({}, la, { res: 'FAILED' }) });
+  assert.ok(!env.cal.lockState(CFG.LOCK_CALENDAR_ID, lockId).la, 'a failed result is never recorded');
+  await turn('m2', { wasHolder: false, la });
+  assert.ok(!env.cal.lockState(CFG.LOCK_CALENDAR_ID, lockId).la, 'only the lock holder records it');
+  await turn('m3', { la: Object.assign({ evil: 'x' }, la) });
+  const st = env.cal.lockState(CFG.LOCK_CALENDAR_ID, lockId).la;
+  assert.deepStrictEqual(Object.keys(st).sort(), ['act', 'at', 'ev', 'id', 'ns', 'os', 'res', 'sum', 'svc'], 'only the known fields are stored');
+  assert.ok(Number.isFinite(st.at) && st.at <= env.sim.now && st.at > env.sim.now - 600000, 'stamped with the server time of the release');
+  const next = await turn('m4', {});
+  assert.deepStrictEqual(Object.assign({}, next.lastAction, { at: 0 }), Object.assign({}, st, { at: 0 }), 'the next acquire returns the record');
+  // Another customer's lock object never holds it.
+  assert.strictEqual(env.cal.lockState(CFG.LOCK_CALENDAR_ID, E.chatLockId('ig:17841499999999999:5512345678901234')), null);
+});
+
 if (require.main === module) runTests('unit.engine').then((r) => process.exit(r.fail ? 1 : 0));

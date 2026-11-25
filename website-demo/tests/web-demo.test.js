@@ -163,7 +163,7 @@ async function send(env, body, o) {
   return Object.assign({ runner: r }, mine[0]);
 }
 const msg = (sessionId, message, lang) => ({ sessionId, message, lang: lang || 'en', channel: 'web' });
-const events = (env) => [...env.cal.store(CAL).values()].map((e) => e.cur).filter((e) => e.status !== 'cancelled' && !/^lumdemolock/.test(e.id));
+const events = (env) => [...env.cal.store(CAL).values()].map((e) => e.cur).filter((e) => e.status !== 'cancelled' && !/^lumdemo(lock|rl)/.test(e.id)); // appointments only (no lock / rate-limit counter objects)
 const lockHeld = (env) => [...env.cal.store(CAL).values()].map((e) => e.cur).filter((e) => /^lumdemolockchat/.test(e.id)).some((e) => { try { return !!JSON.parse(e.description).h && JSON.parse(e.description).hx > env.sim.now; } catch (x) { return false; } });
 const T = DEMO.texts;
 const bookArgs = (date, start, end, summary, service) => ({ start_datetime: date + 'T' + start + ':00', end_datetime: date + 'T' + end + ':00', summary, service });
@@ -790,6 +790,217 @@ test('A7 regression: with requested_time REQUIRED (the previous build) a date-on
   const { r, call } = await checkVia(env, { requested_date: TUE }, 'Do you have any availability this Saturday?');
   assert.strictEqual(call, undefined, 'n8n never ran the tool');
   assert.ok(r.body.reply.indexOf(T.en.fallback) >= 0, 'old build -> fallback: ' + r.body.reply);
+});
+
+// ---------------------------------------------------------------- 2026-11-25: confirmed actions (issue 1)
+// Found live: after the server cancelled / moved an appointment, the NEXT AI turn truthfully
+// repeated "your appointment has been cancelled" (from its [System log]); Sanitize AI Output
+// saw no Cancel tool call in that turn and replaced the reply with the technical fallback.
+const CONFIRMX = require('../../engine/confirm.js').createConfirm();
+const TX = CONFIRMX.texts('en');
+// Book one appointment for session s and leave a pending cancel / reschedule proposal.
+async function bookAndPropose(env, s, act) {
+  env.ai.behave = () => ({ tools: [['book', bookArgs('2026-10-07', '09:30', '10:15', 'Lina Demo', 'Manicure')]], output: 'Booked!' });
+  await send(env, msg(s, 'book a manicure'));
+  env.ai.behave = () => ({ tools: [act === 'cancel' ? ['cancel', { appointment_date: '2026-10-07', appointment_time: '09:30' }] : ['reschedule', { old_appointment_date: '2026-10-07', old_appointment_time: '09:30', new_appointment_date: '2026-10-07', new_appointment_time: '15:00' }]], output: 'OK' });
+  const ask = await send(env, msg(s, act === 'cancel' ? 'cancel it' : 'move it to 15:00'));
+  assert.ok(/Just to confirm/.test(ask.body.reply), ask.body.reply);
+}
+// What the real model does after a confirmed change: it repeats the system log in its own words.
+const truthfulAi = (env, text) => { env.ai.behave = () => ({ output: text }); };
+const execCount = (env) => env.toolCalls.filter((t) => t.exec).length;
+const apptState = (env) => events(env).map((e) => e.start.dateTime.slice(11, 16));
+const isFallback = (r) => r.body.reply.indexOf(T.en.fallback) >= 0;
+
+test('F1 cancellation: one success reply; a late "Yes" is answered by the server (already done), never the fallback, never re-executed', async () => {
+  const env = makeEnv(); const s = sid();
+  await bookAndPropose(env, s, 'cancel');
+  const done = await send(env, msg(s, 'Yes'));
+  assert.ok(/has been cancelled/.test(done.body.reply) && !isFallback(done), done.body.reply);
+  assert.deepStrictEqual([execCount(env), apptState(env)], [1, []]);
+  truthfulAi(env, 'Your appointment has been cancelled.');
+  const late = await send(env, msg(s, 'Yes'));
+  assert.ok(!isFallback(late), 'late yes -> fallback: ' + late.body.reply);
+  assert.ok(/already/i.test(late.body.reply) && /cancelled/.test(late.body.reply), late.body.reply);
+  assert.strictEqual(execCount(env), 1, 'a late yes never executes again');
+});
+
+test('F2 rescheduling: one success reply; a late "Yes" and a truthful AI recap are answered from the server record, never the fallback', async () => {
+  const env = makeEnv(); const s = sid();
+  await bookAndPropose(env, s, 'reschedule');
+  const done = await send(env, msg(s, 'yes please'));
+  assert.ok(/is now on/.test(done.body.reply), done.body.reply);
+  assert.deepStrictEqual(apptState(env), ['15:00']);
+  truthfulAi(env, 'Great, your appointment has been rescheduled to 15:00.');
+  const late = await send(env, msg(s, 'ok'));
+  assert.ok(!isFallback(late) && /already/i.test(late.body.reply) && /15:00/.test(late.body.reply), late.body.reply);
+  const recap = await send(env, msg(s, 'thanks!'));
+  assert.ok(!isFallback(recap), 'truthful recap after a confirmed move -> fallback: ' + recap.body.reply);
+  assert.ok(recap.body.reply.indexOf('Great, your appointment has been rescheduled') < 0, 'the AI claim itself is never passed through: ' + recap.body.reply);
+  assert.deepStrictEqual([execCount(env), apptState(env)], [1, ['15:00']]);
+});
+
+test('F3 duplicate confirmations: two simultaneous "Yes" -> exactly one change, one success reply, one "already done", no fallback', async () => {
+  const env = makeEnv(); const s = sid();
+  await bookAndPropose(env, s, 'cancel');
+  truthfulAi(env, 'Your appointment has been cancelled.');
+  const rs = await sendMany(env, [msg(s, 'Yes'), msg(s, 'Yes')]);
+  const replies = rs.map((r) => r.body.reply);
+  assert.strictEqual(replies.filter((x) => /^Done: .*has been cancelled/.test(x)).length, 1, replies.join(' || '));
+  assert.strictEqual(replies.filter((x) => /already/i.test(x)).length, 1, replies.join(' || '));
+  assert.ok(!rs.some(isFallback), replies.join(' || '));
+  assert.deepStrictEqual([execCount(env), apptState(env)], [1, []]);
+});
+
+test('F4 failed operation: no success is reported and nothing is "already done" afterwards', async () => {
+  const env = makeEnv(); const s = sid();
+  await bookAndPropose(env, s, 'cancel');
+  env.cal.opts.fault = (req) => (req.method === 'DELETE' ? { kind: '500' } : null);
+  const r = await send(env, msg(s, 'Yes'));
+  env.cal.opts.fault = null;
+  assert.ok(!/^Done/.test(r.body.reply) && !/has been cancelled/.test(r.body.reply), 'success reported for a failed write: ' + r.body.reply);
+  truthfulAi(env, 'Your appointment has been cancelled.');
+  const late = await send(env, msg(s, 'Yes'));
+  assert.ok(!/already/i.test(late.body.reply), 'a failed operation is never "already done": ' + late.body.reply);
+  assert.ok(isFallback(late), 'an unbacked AI claim is still rejected: ' + late.body.reply);
+});
+
+test('F5 declined confirmation: "No" keeps it; a later "Yes" executes nothing and is never "already done"; AI claims stay rejected', async () => {
+  const env = makeEnv(); const s = sid();
+  await bookAndPropose(env, s, 'cancel');
+  const no = await send(env, msg(s, 'No'));
+  assert.ok(/nothing was changed/.test(no.body.reply), no.body.reply);
+  truthfulAi(env, 'Your appointment has been cancelled.');
+  const late = await send(env, msg(s, 'Yes'));
+  assert.ok(!/already/i.test(late.body.reply) && isFallback(late), late.body.reply);
+  assert.deepStrictEqual([execCount(env), apptState(env)], [0, ['09:30']]);
+});
+
+test('F6 the server record is bound to its session and expires: another session, or the same one after 2 h, gets no "already done"', async () => {
+  const env = makeEnv(); const s = sid(), other = sid();
+  await bookAndPropose(env, s, 'cancel');
+  await send(env, msg(s, 'Yes'));
+  truthfulAi(env, 'Your appointment has been cancelled.');
+  const b = await send(env, msg(other, 'Yes'));
+  assert.ok(!/already/i.test(b.body.reply) && isFallback(b), 'another session: ' + b.body.reply);
+  env.sim.now += 2 * 3600000 + 1000;
+  const stale = await send(env, msg(s, 'Yes'));
+  assert.ok(!/already/i.test(stale.body.reply) && isFallback(stale), 'stale record must not be used: ' + stale.body.reply);
+  assert.strictEqual(execCount(env), 1);
+});
+
+// ---------------------------------------------------------------- 2026-11-25: atomic rate limits (issue 2)
+// Found live: the counters lived in n8n workflow static data, which every execution loads at its
+// start and writes back at its end - overlapping executions overwrote each other's increments.
+// Several INDEPENDENT executions started at the same instant (like simultaneous webhook calls).
+async function sendMany(env, bodies, opts) {
+  const runs = bodies.map((b, i) => {
+    const r = new Runner(env.main, { sim: env.sim, persisted: env.persisted, envVars: env.envVars, opts: env.opts, hooks: mainHooks(env) });
+    return { r, p: r.run('Website Webhook', [webItem(b, (opts && opts[i]) || {})]) };
+  });
+  await env.sim.run();
+  const out = [];
+  for (const { r, p } of runs) {
+    const res = await p;
+    if (res.error) throw res.error;
+    const mine = env.responses.filter((x) => x.exec === r.execId);
+    assert.strictEqual(mine.length, 1, 'one response per request');
+    out.push(mine[0]);
+  }
+  return out;
+}
+// Small limits so the boundaries are reached quickly (session 3, IP 5, global 6/h and 9/day).
+const TINY_MAIN = JSON.parse(withCal(raw.main, CAL));
+{
+  const n = TINY_MAIN.nodes.find((x) => x.name === 'DEMO CONFIG');
+  const before = n.parameters.jsCode;
+  n.parameters.jsCode = before.replace(/"SESSION_MSGS_PER_HOUR": \d+/, '"SESSION_MSGS_PER_HOUR": 3').replace(/"IP_MSGS_PER_HOUR": \d+/, '"IP_MSGS_PER_HOUR": 5')
+    .replace(/"GLOBAL_MSGS_PER_HOUR": \d+/, '"GLOBAL_MSGS_PER_HOUR": 6').replace(/"GLOBAL_MSGS_PER_DAY": \d+/, '"GLOBAL_MSGS_PER_DAY": 9');
+  assert.ok(/"SESSION_MSGS_PER_HOUR": 3/.test(n.parameters.jsCode) && /"GLOBAL_MSGS_PER_DAY": 9/.test(n.parameters.jsCode), 'test setup: limits not found in DEMO CONFIG');
+}
+const HUMAN = 'I want to talk to a real person'; // scripted reply: counted, but no AI call
+const tally = (rs) => ({ ok: rs.filter((r) => r.body.reply === T.en.human).length, limited: rs.filter((r) => r.body.reply === T.en.rateLimited).length, busy: rs.filter((r) => r.body.reply === T.en.busy).length });
+const eqTally = (rs, want, label) => { const got = tally(rs); assert.deepStrictEqual(got, want, (label ? label + ": " : "") + "got " + JSON.stringify(got) + ", expected " + JSON.stringify(want)); };
+const ipOf = (i) => ({ ip: '198.51.' + Math.floor(i / 200) + '.' + (i % 200 + 1) });
+
+test('RL1 session limit under concurrency: 8 simultaneous requests of one session (limit 3) -> exactly 3 allowed', async () => {
+  const env = makeEnv({ main: TINY_MAIN }); const s = sid();
+  const rs = await sendMany(env, Array.from({ length: 8 }, () => msg(s, HUMAN)), Array.from({ length: 8 }, (_, i) => ipOf(i)));
+  eqTally(rs, { ok: 3, limited: 5, busy: 0 });
+  // The executions really collided: some conditional writes were refused (412) and retried - none was lost.
+  const casLost = env.cal.log.filter((x) => x.method === 'PUT' && /lumdemorls/.test(x.url) && x.status === 412).length;
+  assert.ok(casLost > 0, 'the test must exercise contention (412 on the session counter), got ' + casLost);
+  const sc = [...env.cal.store(CAL).values()].map((e) => e.cur).find((e) => /^lumdemorls/.test(e.id));
+  assert.strictEqual(JSON.parse(sc.description).c.n, 8, 'all 8 requests were counted - no increment lost');
+});
+
+test('RL2 IP limit under concurrency: 9 simultaneous sessions from one IP (limit 5) -> exactly 5 allowed', async () => {
+  const env = makeEnv({ main: TINY_MAIN });
+  const rs = await sendMany(env, Array.from({ length: 9 }, () => msg(sid(), HUMAN)), Array.from({ length: 9 }, () => ({ ip: '192.0.2.50' })));
+  eqTally(rs, { ok: 5, limited: 4, busy: 0 });
+});
+
+test('RL3 overall hourly cap under concurrency: 10 simultaneous visitors (cap 6) -> exactly 6 allowed, 4 "busy"', async () => {
+  const env = makeEnv({ main: TINY_MAIN });
+  const rs = await sendMany(env, Array.from({ length: 10 }, () => msg(sid(), HUMAN)), Array.from({ length: 10 }, (_, i) => ipOf(i)));
+  eqTally(rs, { ok: 6, limited: 0, busy: 4 });
+  const g = JSON.parse([...env.cal.store(CAL).values()].map((e) => e.cur).find((e) => e.id === 'lumdemorlg01').description);
+  assert.deepStrictEqual([g.h.n, g.d.n], [6, 6], 'the overall counter holds exactly the 6 allowed requests');
+  assert.ok(env.cal.log.some((x) => x.method === 'PUT' && x.url.indexOf('lumdemorlg01') >= 0 && x.status === 412), 'contention on the overall counter was exercised');
+});
+
+test('RL8 heavy burst: 40 simultaneous requests of one session, from one IP -> exactly the limits, every increment kept', async () => {
+  const env = makeEnv({ main: TINY_MAIN }); const s = sid();
+  const rs = await sendMany(env, Array.from({ length: 40 }, () => msg(s, HUMAN)), Array.from({ length: 40 }, () => ({ ip: '192.0.2.99' })));
+  const t = tally(rs);
+  // A request is allowed only if BOTH its own committed session count (<= 3) and IP count (<= 5) are
+  // within the limits; the two counters commit in different orders, so 1 to 3 requests qualify - never more.
+  // Contention may make some requests give up waiting: they are REFUSED ("busy"), never let through.
+  assert.ok(t.ok >= 1 && t.ok <= 3, 'never more than the session limit: ' + JSON.stringify(t));
+  assert.strictEqual(t.ok + t.limited + t.busy, 40, JSON.stringify(t));
+  const objs = [...env.cal.store(CAL).values()].map((e) => e.cur);
+  const sc = JSON.parse(objs.find((e) => /^lumdemorls/.test(e.id)).description).c.n, ic = JSON.parse(objs.find((e) => /^lumdemorli/.test(e.id)).description).c.n;
+  // No lost increment: every request that got past the counters was committed on both of them.
+  assert.ok(sc >= t.ok + t.limited && ic >= t.ok + t.limited, 'every committed request was counted: session ' + sc + ', ip ' + ic + ', ' + JSON.stringify(t));
+  if (t.busy === 0) assert.deepStrictEqual([sc, ic], [40, 40], 'all 40 increments kept');
+  const g = JSON.parse(objs.find((e) => e.id === 'lumdemorlg01').description);
+  assert.strictEqual(g.h.n, t.ok, 'only allowed requests used the overall budget');
+});
+
+test('RL4 overall daily cap and window resets: the hour resets, the day (cap 9) does not, the next day does', async () => {
+  const env = makeEnv({ main: TINY_MAIN });
+  let n = 0; const burst = async (k) => sendMany(env, Array.from({ length: k }, () => msg(sid(), HUMAN)), Array.from({ length: k }, () => ipOf(n++)));
+  eqTally(await burst(6), { ok: 6, limited: 0, busy: 0 });
+  env.sim.now += 3600001;
+  eqTally(await burst(6), { ok: 3, limited: 0, busy: 3 }, 'new hour, but only 3 left today');
+  env.sim.now += 24 * 3600001;
+  eqTally(await burst(2), { ok: 2, limited: 0, busy: 0 }, 'next day');
+});
+
+test('RL5 a limited request never consumes the overall budget; boundary requests at the exact limit are allowed', async () => {
+  const env = makeEnv({ main: TINY_MAIN }); const s = sid();
+  const first = await sendMany(env, Array.from({ length: 5 }, () => msg(s, HUMAN)), Array.from({ length: 5 }, (_, i) => ipOf(i)));
+  assert.deepStrictEqual(tally(first), { ok: 3, limited: 2, busy: 0 }, 'the 3rd (= limit) is allowed, the 4th and 5th are not');
+  const rest = await sendMany(env, Array.from({ length: 4 }, () => msg(sid(), HUMAN)), Array.from({ length: 4 }, (_, i) => ipOf(50 + i)));
+  eqTally(rest, { ok: 3, limited: 0, busy: 1 }, 'only the 3 allowed requests used the cap of 6');
+});
+
+test('RL6 counter storage failure fails closed: "busy" notice, no AI call, nothing stored', async () => {
+  const env = makeEnv({ main: TINY_MAIN, ai: { behave: () => ({ thinkMs: 10, output: 'OK' }) } });
+  env.cal.opts.fault = (req) => (/lumdemorl/.test(req.url || '') ? { kind: '503' } : null);
+  const r = await send(env, msg(sid(), 'Hello'));
+  assert.strictEqual(r.body.reply, T.en.busy, r.body.reply);
+  assert.strictEqual(env.aiCalls.length, 0);
+});
+
+test('RL7 counters hold only hashed keys and counts: no session id, IP or message in the stored objects', async () => {
+  const env = makeEnv({ main: TINY_MAIN }); const s = 'secret-session-zorglub-1';
+  await sendMany(env, [msg(s, HUMAN + ' Zorglub')], [{ ip: '203.0.113.250' }]);
+  const rl = [...env.cal.store(CAL).values()].map((e) => e.cur).filter((e) => /^lumdemorl/.test(e.id));
+  assert.strictEqual(rl.length, 3, 'one counter object for the session, the IP and the overall budget');
+  const dump = JSON.stringify(rl);
+  for (const bad of ['zorglub', 'Zorglub', '203.0.113.250', s]) assert.ok(dump.indexOf(bad) < 0, 'counter objects contain ' + bad);
+  for (const e of rl) assert.ok(/^[0-9a-v]+$/.test(e.id) && e.transparency === 'transparent' && e.start.dateTime.indexOf('2000-01-01') === 0, e.id);
 });
 
 runTests('web-demo').then((r) => process.exit(r.fail ? 1 : 0));

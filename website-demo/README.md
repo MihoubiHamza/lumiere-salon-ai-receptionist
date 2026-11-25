@@ -95,6 +95,12 @@ Days below are relative: "Tuesday" means the next Tuesday. Sunday is the closed 
 ### Extra checks
 - **Booking limit:** in one tab, book 2 appointments, then ask for a third. Yasmine should say the demo allows 2 and offer to cancel or move one.
 - **Rate limit:** after 30 messages in one hour from one tab, you get the limit notice. The website itself also stops at 20 messages.
+- **How the limits are counted (since 2026-11-25):** 30 per session per hour, 60 per IP per hour, 120 per hour and 600 per day overall.
+  - Each counter is a small lock object on the demo calendar, dated 2000-01-01, transparent and private. Their ids start with `lumdemorl`; session and IP are salted one-way hashes. They hold only a window start and a count.
+  - Every increment is a conditional write (ETag `If-Match`), so simultaneous requests can never overwrite each other's counts.
+  - If the counters cannot be read or written, the request gets the "busy" notice, with no AI call.
+  - Counting adds a few calendar calls (about 1-2 s) to each message.
+  - Counter objects are not cleaned up automatically yet, like the per-session chat-lock objects.
 - **Cleanup:** the next day after 03:00, every `DEMO - …` event created more than 24 h earlier is gone.
 
 ## Not verified live
@@ -104,7 +110,7 @@ The tests run the real JSON in the project's n8n emulator, with a fake Google Ca
 - **How the real model behaves** with the salon prompt: language choice, natural Spanish, service durations, short replies, fake-name reminder. That is what the test script above checks.
 - **CORS:** the Webhook node's `allowedOrigins` option and the browser's preflight request on your n8n version.
 - **The per-IP limit** depends on your proxy sending `CF-Connecting-IP` or `X-Forwarded-For`.
-- **Test-URL runs don't remember anything between messages**: the static data (notice, rate limits) is only saved for active (production) executions.
+- **Test-URL runs don't remember the first-message notice between messages**: that notice is kept in static data, which is only saved for active (production) executions. The rate-limit counters are on the demo calendar, so test-URL runs count too.
 
 ## Maintenance
 
