@@ -304,7 +304,9 @@ for (const ev of events) {
   if (!E.phoneMatches(ev, idn)) continue;
   const s = Date.parse(ev.start.dateTime);
   if (targetDate && E.ymd(s) !== targetDate) continue;
-  matches.push({ summary: String(ev.summary || '').replace(/^=+/, ''), date: E.ymd(s), time: E.hm(s) });
+  const e = ev.end && ev.end.dateTime ? Date.parse(ev.end.dateTime) : s + CFG.APPT_DEFAULT_MIN * 60000;
+  const sl = E.svcLineOf(ev); // the service line the booking system wrote (current services and keys)
+  matches.push({ summary: String(ev.summary || '').replace(/^=+/, ''), date: E.ymd(s), time: E.hm(s), until: E.hm(e), services: sl ? sl.line.replace(/^Service: /, '').replace(/ \\| Keys: ([a-z0-9_,]+) \\| Duration: (\\d+) min$/, ' [keys: $1; $2 min]') : '' });
 }
 matches.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
 let result;
@@ -313,7 +315,7 @@ if (!matches.length) {
   result = 'NOT_FOUND: No appointments of this customer found' + (targetDate ? ' on ' + targetDate : ' in the next 90 days') + '.' +
     ' If the customer says it was booked from a different phone number, another channel or by someone else, do not search for it and never ask for that number: call Escalate_to_Staff (NEED_STAFF).';
 } else {
-  result = 'FOUND: ' + matches.map((m, i) => (i + 1) + ') ' + m.summary + ' on ' + m.date + ' at ' + m.time).join('; ');
+  result = 'FOUND: ' + matches.map((m, i) => (i + 1) + ') ' + m.summary + ' on ' + m.date + ' at ' + m.time + ' (until ' + m.until + (m.services ? '; services: ' + m.services : '') + ')').join('; ');
 }
 return [{ json: { status: matches.length ? 'found' : 'not_found', matches, result } }];
 `;
@@ -918,11 +920,21 @@ const SERVICE_LENGTH_RULE = '- SERVICES AND LENGTH: every booking is for one or 
 const SERVICE_CHECK_RULE = 'Always pass service_keys = the [key]s of ALL the services chosen (e.g. balayage,womens_cut), so the whole appointment length - calculated by the system - is checked. SERVICE_REQUIRED / SERVICE_UNKNOWN / SERVICE_AMBIGUOUS: nothing was checked - ask which service(s) exactly, never guess. TOO_LONG: the services together exceed the 4-hour maximum for one appointment - explain it and offer separate appointments or fewer services.';
 const SERVICE_CHANGE_LIST_ITEM = '- changing or adding services (pass new_service_keys - see CHANGING THE SERVICES OF AN APPOINTMENT below)';
 const SERVICE_CHANGE_SECTION = '## CHANGING THE SERVICES OF AN APPOINTMENT\n' +
-  'Reschedule_Appointment also changes the services of an existing appointment. Pass new_service_keys = the [key]s of ALL the services the customer wants in this appointment from now on (the complete new selection - not only the added service), together with the new date and time (the CURRENT date and time again if only the services change).\n' +
+  'Reschedule_Appointment also changes the services of an existing appointment. Pass new_service_keys = the [key]s of ALL the services the customer wants in this appointment from now on (the complete new selection - not only the added service; Find_Patient_Appointments shows each appointment\'s current services, their keys and its end time), together with the new date and time (the CURRENT date and time again if only the services change).\n' +
   '1. First call Check_Availability with the new service_keys for that time (and exclude_appointment_time = the current start time when it is on the same date, so the customer\'s own appointment does not count as busy), because a longer appointment needs more free time after it. Only offer other times that Check_Availability has confirmed.\n' +
   '2. Then call Reschedule_Appointment with new_service_keys. The system recalculates the length from the price list, checks that the WHOLE new length is free, and itself asks the customer to confirm the exact new services, total length and end time. Nothing changes before their yes.\n' +
   '3. If they say no, or the result is CONFLICT / OUTSIDE_HOURS / CLOSED_DAY / ERROR, the original appointment stays exactly as it was - tell the customer so.\n' +
   'Never cancel an appointment and book a new one to change its services: always use Reschedule_Appointment with new_service_keys (one confirmed change).';
+const SERVICE_READBACK_SECTION = '## SERVICES, TOTAL LENGTH AND PRICE - READ BACK BEFORE YOU BOOK OR CHANGE\n' +
+  '1. Build the COMPLETE selection: every service this ONE person wants in this visit. If the customer names a service that another chosen service already includes (SERVICES & PRICES says "already includes" - e.g. the women\'s haircut & styling already includes the blow-dry), do not add it: say briefly that it is already part of the other service.\n' +
+  '2. Before booking or changing services, read the complete selection back to the customer in their language, with the total length and the starting price exactly as the tool result states them (Check_Availability FREE and Book_Appointment SUCCESS results contain "Services: ... = N minutes in total ...; starting price ..."). Never add up durations or prices yourself. A price marked "from" is a starting price: the final price is confirmed at the salon.\n' +
+  '3. Whenever the selection changes (a service added, removed or swapped), call Check_Availability AGAIN with the new service_keys before confirming any time: a longer appointment may no longer fit at the same time.\n' +
+  '4. Alternatives: only propose times or days that a Check_Availability result has shown to be free for the WHOLE selection. If the customer asks about another day, check that day first. Never suggest a time or day you have not checked (no "maybe tomorrow?").\n' +
+  '5. Say the limits plainly and kindly, and never invent a workaround:\n' +
+  '   - one appointment is for one person and lasts at most 4 hours (TOO_LONG): offer two separate appointments (each one checked and booked on its own) or fewer services;\n' +
+  '   - only the services in SERVICES & PRICES exist, with exactly those durations and prices (SERVICE_UNKNOWN): never invent a service, a shorter version, a duration or a price;\n' +
+  '   - the calendar is one shared agenda with no per-stylist schedule;\n' +
+  '   - when the system refuses or fails, tell the customer what really happened and what was NOT done.';
 const PROMPT_SERVICE_EDITS = [
   ['- changing the service (only when the new service has the SAME duration - see SERVICE CHANGE WITH A DIFFERENT DURATION below)', SERVICE_CHANGE_LIST_ITEM],
   ['- SERVICE AND DURATION: every booking is for one or more services from SERVICES & PRICES. The appointment end time is the start time plus that service\'s duration (add the durations when several services are done in one visit). If the customer\'s wish does not clearly match one service, ask a short question (e.g. "¿Solo corte, o corte y secado?") instead of guessing.', SERVICE_LENGTH_RULE],
@@ -939,6 +951,7 @@ const REQUIRED_PROMPT_RULES = [
   SERVICE_CHECK_RULE,
   SERVICE_CHANGE_LIST_ITEM,
   SERVICE_CHANGE_SECTION,
+  SERVICE_READBACK_SECTION,
 ];
 // Older prompt rules told the AI to ask "can you confirm?" itself before calling Cancel /
 // Reschedule. With the server-side confirmation gate that means asking twice, and in live
@@ -962,6 +975,11 @@ function patchPrompt(p) {
     const b = p.indexOf('\n\n## ', a + 1);
     if (a < 0 || b < 0) throw new Error('build: prompt section SERVICE CHANGE WITH A DIFFERENT DURATION not found');
     p = p.slice(0, a) + SERVICE_CHANGE_SECTION + p.slice(b);
+  }
+  if (p.indexOf(SERVICE_READBACK_SECTION) < 0) {
+    const old = p.indexOf('## SERVICES, TOTAL LENGTH AND PRICE - READ BACK BEFORE YOU BOOK OR CHANGE\n');
+    if (old >= 0) p = p.slice(0, old) + p.slice(p.indexOf('\n\n## ', old) + 2); // an earlier wording
+    p = replaceOnce(p, SERVICE_CHANGE_SECTION, SERVICE_READBACK_SECTION + '\n\n' + SERVICE_CHANGE_SECTION, 'prompt read-back section');
   }
   if (/cancel the current appointment and book|ORIGINAL length/.test(p)) throw new Error('build: the AI prompt still tells it to cancel and re-book to change a service');
   for (const r of REQUIRED_PROMPT_RULES) if (p.indexOf(r) < 0) throw new Error('build: the AI prompt lost a required rule: ' + r.slice(0, 80));

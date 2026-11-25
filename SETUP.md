@@ -161,7 +161,7 @@ Run `node tools/preflight.js` first: it ticks the offline items and exits with a
 - [ ] `websiteDemo.CALENDAR_ID` = the new `Lumière Demo` calendar, different from the salon calendar
 - [ ] `websiteDemo.PUBLIC_WEBHOOK_URL` = `https://<n8n>/webhook/lumiere-website-demo`; `ALLOWED_ORIGINS` = the website's origin
 - [ ] Builds re-run after editing; `node tools/preflight.js` says "Offline checks passed"
-- [ ] `cd tests; npm test` → ALL SUITES PASSED (277 tests)
+- [ ] `cd tests; npm test` → ALL SUITES PASSED (279 tests)
 
 **Google (manual)**
 - [ ] Both calendars exist, and the n8n Google accounts can **make changes to events** on them

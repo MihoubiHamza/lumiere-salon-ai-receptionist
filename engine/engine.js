@@ -1307,7 +1307,7 @@ function createEngine(CFG, CONF) {
   }
   return {
     init, step,
-    _t: { parseDateTime, parseYmd, parseHm, fmtLocal, isoLocal, localMs, ymd, hm, slotRule, endRule, identity, busyView, matchView, phoneMatches, allDayBlock, normPhone, chatLockId: chatLockIdFor, customerOf, customerCtx, ownerKeyOf, cls, lp, resolveServices, normSvc, svcFields },
+    _t: { parseDateTime, parseYmd, parseHm, fmtLocal, isoLocal, localMs, ymd, hm, slotRule, endRule, identity, busyView, matchView, phoneMatches, allDayBlock, normPhone, chatLockId: chatLockIdFor, customerOf, customerCtx, ownerKeyOf, cls, lp, resolveServices, normSvc, svcFields, svcLineOf },
   };
 }
 if (typeof module !== 'undefined' && module.exports) module.exports = { createEngine };

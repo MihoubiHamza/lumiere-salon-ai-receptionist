@@ -1,5 +1,19 @@
 # CHANGELOG — Lumière Hair & Beauty Studio AI Receptionist
 
+## Prompt: read back services, total length and price; only checked alternatives (2026-11-25)
+
+Nothing was imported or published.
+
+- **New prompt section "SERVICES, TOTAL LENGTH AND PRICE - READ BACK BEFORE YOU BOOK OR CHANGE"** (WhatsApp, Messenger, Instagram and website). Yasmine:
+  - builds the complete selection for one person and never adds a service that another chosen one already includes (she says it is already part of it);
+  - reads back the complete selection with the total length and starting price exactly as the tool result states them, never her own sum ("from" prices are starting prices);
+  - calls Check_Availability again whenever the selection changes;
+  - proposes only times or days that a Check_Availability result showed free for the whole selection;
+  - explains the limits honestly: one person and at most 4 hours per appointment (offer separate appointments), only the listed services, durations and prices (no invented shorter version), one shared agenda, and what was NOT done when the system refuses or fails.
+- **"CHANGING THE SERVICES OF AN APPOINTMENT"** points to Find_Patient_Appointments for the current services.
+- **Find_Patient_Appointments** now shows, for the customer's OWN appointments only, the end time and the current services with their keys and length, e.g. `… at 10:00 (until 14:00; services: Balayage + Women's haircut & styling [keys: balayage,womens_cut,blow_dry; 240 min])`. Appointments without a service line show their end time.
+- **Tests:** SV12 (the rules are present on all four channels; no cancel + re-book anywhere) and SV13 (Find output, privacy). `npm test`: 16 suites, 279 tests.
+
 ## C2: safe service changes in one confirmed update (2026-11-25)
 
 Changing the services of an existing appointment (e.g. adding a balayage to a blow-dry) no longer means "cancel, then book again". Nothing was imported or published.

@@ -234,4 +234,38 @@ test('SV11 tool contracts: the AI sends service keys, never a duration or an end
   assert.ok(!/durationMin|duration_minutes|requestedEndMs/.test(v), 'Validate Input no longer reads an AI duration');
 });
 
+test('SV12 prompt (WhatsApp, Messenger, Instagram, website): read-back, re-check, checked alternatives, honest limits; no cancel + re-book', () => {
+  const B = require(path.join(ROOT, 'tools', 'build-workflows.js'));
+  const files = [B.FILES.main, 'Lumiere Messenger AI Agent.json', 'Lumiere Instagram AI Agent.json', path.join('website-demo', 'Lumiere Salon - Website Demo.json')];
+  for (const f of files) {
+    const p = JSON.parse(fs.readFileSync(path.join(ROOT, f), 'utf8')).nodes.find((x) => x.name === 'AI Agent').parameters.options.systemMessage;
+    const sec = (h) => { const a = p.indexOf('## ' + h); assert.ok(a >= 0, f + ' has ' + h); return p.slice(a, p.indexOf('\n\n## ', a + 1)); };
+    const rb = sec('SERVICES, TOTAL LENGTH AND PRICE - READ BACK BEFORE YOU BOOK OR CHANGE');
+    for (const re of [/already includes.*do not add it/, /read the complete selection back.*total length and the starting price exactly as the tool result states/, /Never add up durations or prices yourself/,
+      /Whenever the selection changes.*call Check_Availability AGAIN with the new service_keys/, /only propose times or days that a Check_Availability result has shown to be free for the WHOLE selection/,
+      /at most 4 hours \(TOO_LONG\)/, /never invent a service, a shorter version, a duration or a price/, /what was NOT done/]) assert.ok(re.test(rb), f + ': ' + re);
+    const ch = sec('CHANGING THE SERVICES OF AN APPOINTMENT');
+    assert.ok(/new_service_keys/.test(ch) && /exclude_appointment_time/.test(ch) && /Never cancel an appointment and book a new one to change its services/.test(ch), f);
+    assert.ok(p.indexOf('SERVICE CHANGE WITH A DIFFERENT DURATION') < 0 && !/cancel the current appointment and book/.test(p), f + ' still has the cancel + re-book procedure');
+  }
+  // The website prompt receives its SERVICES & PRICES menu from DEMO CONFIG at runtime: same [key] + inclusion format.
+  const web = JSON.parse(fs.readFileSync(path.join(ROOT, files[3]), 'utf8'));
+  const cfgCode = web.nodes.find((n) => n.name === 'DEMO CONFIG').parameters.jsCode;
+  assert.ok(cfgCode.indexOf("'- [' + s.key + '] ' + s.name") >= 0 && cfgCode.indexOf('already includes') >= 0 && cfgCode.indexOf('SERVICE_CATALOG') >= 0, 'website menu with keys and inclusions');
+});
+
+test('SV13 Find_Patient_Appointments shows the customer\'s OWN services, keys and end time (never another customer\'s)', async () => {
+  const env = makeEnv({ seed: 66 });
+  await runAll(env, [() => callTool(env, 'book', book('balayage,womens_cut,blow_dry', '10:00'))]);
+  await runAll(env, [() => callTool(env, 'book', book('manicure', '15:00', { phone_number: '213555000102', summary: 'Other Person - Manicure' }))]);
+  const [mine] = await runAll(env, [() => callTool(env, 'find', { appointment_date: '', phone_number: '213555000101', patient_name: '', booked_phone_number: '' })]);
+  assert.strictEqual(mine.result, "FOUND: 1) Lucía Fernández - Services on 2026-10-06 at 10:00 (until 14:00; services: Balayage + Women's haircut & styling [keys: balayage,womens_cut,blow_dry; 240 min])");
+  assert.ok(!/Other Person|Manicure|15:00/.test(mine.result), 'privacy');
+  // An appointment without a service line (made by hand / before C1) still shows its end time.
+  seedAppt(env, 'legacy01', '16:00', 45);
+  env.cal.store(CAL).get('legacy01').cur.description = 'Phone: 213555000101. Notes: made by staff';
+  const [both] = await runAll(env, [() => callTool(env, 'find', { appointment_date: DAY, phone_number: '213555000101', patient_name: '', booked_phone_number: '' })]);
+  assert.ok(/2\) Other - x on 2026-10-06 at 16:00 \(until 16:45\)$/.test(both.result), both.result);
+});
+
 if (require.main === module) runTests('services').then((r) => process.exit(r.fail ? 1 : 0));
