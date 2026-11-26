@@ -20,8 +20,12 @@
 //   - only events for the salon's own Instagram account (LUMIERE_INSTAGRAM_ACCOUNT_ID);
 //   - customer key "ig:<instagram_account_id>:<igsid>" (never shared with WhatsApp,
 //     Messenger, another account or the website demo);
-//   - TEXT ONLY: voice messages and every attachment get a friendly reply, the
-//     voice pipeline is not part of this workflow;
+//   - typed text AND voice messages in English, French, Spanish and Arabic: a voice
+//     note is downloaded from Meta's CDN, checked (size, real audio format) and
+//     transcribed by OpenRouter speech-to-text with AUTOMATIC language detection
+//     (no fixed VOICE_LANGUAGE). Replies are always text. A transcribed message
+//     passes "Merge Voice Text", so the confirmation gate never accepts it as a
+//     typed yes. Every other attachment gets a friendly "text or voice" reply;
 //   - replies split to Instagram's text limit (bytes, see IG_MAX_BYTES);
 //   - Meta's 24-hour standard messaging window is enforced before every send;
 //   - automated-assistant disclosure on the first reply of a conversation window.
@@ -62,10 +66,39 @@ const DISCLOSURE = {
   ar: '🤖 مرحباً، أنا ياسمين، المساعدة الآلية (ذكاء اصطناعي) لـ' + SALON.name_ar + '. أجيب عن أسئلتك وأدير مواعيدك. اطلب التحدث إلى «شخص» في أي وقت للتواصل مع فريق الصالون.',
 };
 const UNSUPPORTED_TEXT = TAG + '\n' +
-  'Sorry 🙏 on Instagram I can only read typed text messages for now - please write your message.\n' +
-  'Lo siento 🙏 en Instagram por ahora solo puedo leer mensajes de texto: escríbeme tu mensaje.\n' +
-  "Désolée 🙏 sur Instagram je ne lis pour l'instant que les messages écrits : écrivez-moi votre message.\n" +
-  'عذراً 🙏 على إنستغرام يمكنني حالياً قراءة الرسائل النصية فقط، يرجى كتابة رسالتك.';
+  'Sorry 🙏 on Instagram I can read text and voice messages, but not photos, videos, stickers or shared posts - please write or record your message.\n' +
+  'Lo siento 🙏 en Instagram leo mensajes de texto y de voz, pero no fotos, vídeos, stickers ni publicaciones: escríbeme o envíame un audio.\n' +
+  "Désolée 🙏 sur Instagram je lis les messages écrits et vocaux, mais pas les photos, vidéos, stickers ou publications : écrivez-moi ou envoyez un vocal.\n" +
+  'عذراً 🙏 على إنستغرام أقرأ الرسائل النصية والصوتية فقط، وليس الصور أو الفيديوهات أو الملصقات. يرجى كتابة رسالتك أو إرسال رسالة صوتية.';
+// A voice message that could not be used (download failed, unsupported or empty audio,
+// unintelligible, or a language other than the four supported ones). Never technical.
+const VOICE_FAILED_TEXT = TAG + '\n' +
+  "Sorry 🙏 I couldn't understand this voice message. Please try again or type your message (English, Français, Español, العربية).\n" +
+  'Lo siento 🙏 no he podido entender este mensaje de voz. Inténtalo de nuevo o escríbeme tu mensaje.\n' +
+  "Désolée 🙏 je n'ai pas pu comprendre ce message vocal. Réessayez ou écrivez-moi votre message.\n" +
+  'عذراً 🙏 لم أتمكن من فهم هذه الرسالة الصوتية. يرجى المحاولة مرة أخرى أو كتابة رسالتك.';
+
+// ------------------------------------------------------------------ voice notes
+// OpenRouter speech-to-text (verified 2026-11-26 on openrouter.ai/docs): POST
+// /api/v1/audio/transcriptions, multipart field "file" (format from the file name /
+// content type: m4a, aac, ogg, webm, wav, mp3, flac; max 25 MB), "language" omitted =
+// auto-detected, response_format verbose_json returns the detected `language`.
+// Whisper large-v3 covers English, French, Spanish and Arabic (Arabic in Arabic script).
+// Cohere Transcribe (used on WhatsApp/Messenger) is NOT used here: its `language` is
+// required and it has no automatic language detection.
+const VOICE = {
+  url: 'https://openrouter.ai/api/v1/audio/transcriptions',
+  model: 'openai/whisper-large-v3',
+  minBytes: 1000, // anything smaller is not a real recording
+  maxBytes: 10 * 1024 * 1024, // well below the provider's 25 MB (Instagram voice notes are short)
+  downloadTimeoutMs: 20000,
+  transcribeTimeoutMs: 60000, // providers stop processing after about 60 s
+};
+const STT_CRED = { httpHeaderAuth: ENV.credentials.transcription };
+// Only Meta's own media CDN is ever downloaded, over HTTPS (the attachment link is
+// pre-signed: no token is ever sent to it). Anything else is refused before any request.
+const MEDIA_HOST_RE = '^https://(?:[a-z0-9-]+\\.)*(?:fbsbx\\.com|fbcdn\\.net|cdninstagram\\.com)(?::443)?/';
+const VOICE_LANGS = { en: 'English', fr: 'French', es: 'Spanish', ar: 'Arabic' };
 
 // ------------------------------------------------------------------ Code nodes
 // Signature check: the HMAC-SHA256 / SHA-256 implementation is copied verbatim from
@@ -124,7 +157,7 @@ const DEDUP_CODE = `// Instagram intake: same output shape as the WhatsApp / Mes
 // channel-aware customer identity (chat lock, confirmations, memory, pause row,
 // appointment owner): it can never equal a WhatsApp number, a Messenger user, the
 // same IGSID on another account, or a website demo session.
-// TEXT ONLY for now: voice messages and attachments get the "unsupported" reply.
+// Typed text and voice messages are read; other attachments get the "unsupported" reply.
 // Staff alerts go to staff on WhatsApp:
 //   LUMIERE_WHATSAPP_PHONE_NUMBER_ID, LUMIERE_WHATSAPP_ACCESS_TOKEN, LUMIERE_STAFF_CHAT_ID
 const CONFIG = {
@@ -183,14 +216,24 @@ if (!shouldProcess) {
   return [];
 }
 
-// Typed text (also a story reply or a quick-reply tap) and postback buttons are read.
-// Everything else - audio / voice, image, video, file, share, reel, ephemeral,
-// is_unsupported - gets the polite "text only" reply.
+// Typed text (also a story reply or a quick-reply tap), postback buttons and voice
+// messages are read. Everything else - image, video, file, share, reel, ephemeral,
+// is_unsupported - gets the polite "text or voice" reply.
+// A voice message is an "audio" attachment with a pre-signed link on Meta's media CDN.
+// Only such a link (HTTPS, Meta CDN host) is ever downloaded; any other link leaves
+// mediaUrl empty, so the download fails safely and the customer is asked to type.
+const MEDIA_HOST = new RegExp(${JSON.stringify(MEDIA_HOST_RE)}, 'i');
+const audio = atts.find((a) => a.type === 'audio' && a.payload && typeof a.payload.url === 'string');
 let messageType = 'unsupported';
 let textBody = '';
+let mediaUrl = '';
 if (msg && typeof msg.text === 'string' && msg.text.trim()) {
   messageType = 'text';
   textBody = msg.text.slice(0, 2000);
+} else if (audio && !msg.is_unsupported) {
+  messageType = 'voice';
+  const u = String(audio.payload.url).trim();
+  mediaUrl = MEDIA_HOST.test(u) && !/[\\s@\\\\]/.test(u) && u.length <= 4000 ? u : '';
 } else if (postback) {
   messageType = 'text';
   textBody = String(postback.title || postback.payload || '').trim().slice(0, 200) || 'Hello';
@@ -213,7 +256,7 @@ return [{
     textBody,
     hasMedia: atts.length > 0,
     mediaId: '',
-    mediaUrl: '',
+    mediaUrl,
     messageId: msgId,
     msgTs: msgTimestamp,
   }
@@ -278,6 +321,87 @@ if (replyParts.length > IG_MAX_PARTS) replyParts = igSplit((igDisclosure ? igDis
 
 `;
 
+// ------------------------------------------------------------------ voice nodes
+// Meta does not document the format of RECEIVED Instagram voice messages, and a CDN
+// content type can be generic, so the real format is read from the file's first bytes.
+const CHECK_VOICE_CODE = `// Checks the downloaded voice message before transcription: size limits and the REAL
+// audio format (read from the file's first bytes). Any problem -> error output -> the
+// customer gets the friendly "please try again or type" reply. Nothing technical is shown.
+const MIN = ${VOICE.minBytes}, MAX = ${VOICE.maxBytes};
+const MIME = { m4a: 'audio/mp4', aac: 'audio/aac', ogg: 'audio/ogg', webm: 'audio/webm', wav: 'audio/wav', mp3: 'audio/mpeg', flac: 'audio/flac' };
+function sniff(buf) {
+  if (!buf || buf.length < 12) return '';
+  const s = (a, b) => buf.toString('latin1', a, b);
+  if (s(4, 8) === 'ftyp') return 'm4a'; // MP4 / M4A container (AAC audio)
+  if (s(0, 4) === 'OggS') return 'ogg';
+  if (buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3) return 'webm';
+  if (s(0, 4) === 'RIFF' && s(8, 12) === 'WAVE') return 'wav';
+  if (s(0, 4) === 'fLaC') return 'flac';
+  if (s(0, 3) === 'ID3') return 'mp3';
+  if (buf[0] === 0xff && (buf[1] & 0xf6) === 0xf0) return 'aac'; // ADTS AAC frame
+  if (buf[0] === 0xff && (buf[1] & 0xe0) === 0xe0) return 'mp3'; // MPEG audio frame
+  return '';
+}
+const item = $input.first();
+const b = item && item.binary && item.binary.data;
+if (!b) throw new Error('voice download returned no file');
+const buf = await this.helpers.getBinaryDataBuffer(0, 'data');
+if (!buf || buf.length < MIN) throw new Error('voice file is empty or too short');
+if (buf.length > MAX) throw new Error('voice file is larger than the limit');
+const format = sniff(buf);
+if (!format) throw new Error('unsupported audio format');
+b.fileName = 'voice.' + format;
+b.mimeType = MIME[format];
+return [{ json: { audioFormat: format, audioBytes: buf.length }, binary: { data: b } }];
+`;
+
+// Whisper sometimes "hears" these stock phrases in silence or noise (subtitle credits,
+// sign-offs). A transcript that is ONLY one of them is treated as unintelligible.
+// Real short answers ("thank you", "merci", "gracias", "شكرا", "yes") are NOT on this list.
+const SILENCE_PHRASES = ['thanks for watching', 'thank you for watching', 'you',
+  'subtitles by the amara org community', 'sous titres realises par la communaute d amara org', 'merci d avoir regarde',
+  'sous titrage st 501', 'subtitulos realizados por la comunidad de amara org', 'gracias por ver el video', 'gracias por ver',
+  'ترجمة نانسي قنقر', 'اشتركوا في القناة', 'شكرا للمشاهدة'];
+const READ_TRANSCRIPT_CODE = `// Reads the speech-to-text result: the transcript, the language detected from the AUDIO
+// (Whisper), cross-checked against the language of the transcript's TEXT (the same
+// detector the confirmation gate uses). Supported: English, French, Spanish, Arabic.
+//   usable=false -> the customer gets the friendly "please try again or type" reply:
+//     empty / no letters, only a stock phrase Whisper invents for silence, or a
+//     language other than the four supported ones.
+//   voiceLangUncertain=true -> the AI is told to follow the language of the transcript
+//     and to ask the customer to type if it does not make sense.
+` + WB.confirmSource() + `
+const C = createConfirm();
+const NAMES = ${JSON.stringify(VOICE_LANGS)};
+const ISO = { en: 'en', english: 'en', fr: 'fr', french: 'fr', es: 'es', spanish: 'es', castilian: 'es', ar: 'ar', arabic: 'ar' };
+const SILENCE = ${JSON.stringify(SILENCE_PHRASES)};
+const r = $input.first().json || {};
+const text = String(r.text == null ? '' : r.text).replace(/\\s+/g, ' ').trim().slice(0, 2000);
+const norm = (s) => String(s).toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^\\p{L}\\p{N}]+/gu, ' ').trim();
+const letters = (text.match(/\\p{L}/gu) || []).length;
+const raw = String(r.language == null ? '' : r.language).trim().toLowerCase();
+const fromAudio = ISO[raw] || '';
+const fromText = C.detectLang(text);
+const segs = Array.isArray(r.segments) ? r.segments : [];
+const allSilence = segs.length > 0 && segs.every((s) => Number(s && s.no_speech_prob) > 0.8);
+let usable = true, reason = 'ok';
+if (letters < 2) { usable = false; reason = 'empty transcript'; }
+else if (SILENCE.indexOf(norm(text)) >= 0 || allSilence) { usable = false; reason = 'no speech recognised'; }
+else if (raw && !fromAudio && !NAMES[fromText]) { usable = false; reason = 'unsupported language'; }
+const lang = fromAudio || fromText || '';
+const uncertain = !fromAudio || (!!fromText && fromText !== fromAudio);
+return [{ json: {
+  usable, reason,
+  text: usable ? text : '',
+  voiceLang: lang,
+  voiceLangName: NAMES[lang] || 'unknown',
+  voiceLangUncertain: uncertain,
+  audioSeconds: Number(r.duration) || 0,
+} }];
+`;
+// Replaces the WhatsApp/Messenger single-language voice marker of the AI Agent input.
+const IG_VOICE_MARKER = "{{ $('Dedup & Filter Prep').first().json.messageType === 'voice' ? ' (voice note, auto-transcribed - detected language: ' + $('Read Transcript').first().json.voiceLangName + ($('Read Transcript').first().json.voiceLangUncertain ? ', UNCERTAIN' : '') + '. It may contain misheard words: interpret charitably from context. Reply in text, in the detected language; if the language is marked UNCERTAIN, reply in the language the transcript is written in, and if the transcript does not make sense, ask the customer to type their message. A voice note never counts as a confirmation.)' : '' }}";
+
 // ------------------------------------------------------------------ prompt
 const IG_RULES = `
 
@@ -287,7 +411,8 @@ const IG_RULES = `
 - WHO OWNS AN APPOINTMENT: every appointment you book here is automatically linked to THIS Instagram conversation by the system - you never pass, mention or ask for any ID. Find_Patient_Appointments, Cancel_Appointment and Reschedule_Appointment automatically find the appointments booked from this same Instagram conversation. Wherever the rules below or a tool result say "the current WhatsApp number", "this WhatsApp number" or "the number you are texting from", read it as "this Instagram conversation".
 - CONTACT MOBILE NUMBER IS REQUIRED FOR EVERY INSTAGRAM BOOKING: before calling Book_Appointment you must also have the customer's mobile number, stated by the customer in this conversation (a real mobile number: 9 to 15 digits, ideally with the country code). Ask for it together with the other missing details, and only once - if they already gave it, never ask again. Put it in the notes exactly as the Book_Appointment notes field describes. The salon uses it to contact the customer.
 - APPOINTMENTS BOOKED ELSEWHERE: appointments booked on WhatsApp, on Facebook Messenger, by phone call, at the salon, from another Instagram account or by someone else can NEVER be found, shown or changed from here, and a phone number or name the customer types is never proof that an appointment is theirs. Never ask for that number and never search for it. Tell the customer plainly that you can only manage the appointments booked from this conversation (they can also manage it from where it was booked), and call Escalate_to_Staff so a team member can help.
-- TEXT ONLY: on Instagram you can only read typed text messages. Voice messages, photos, videos, stickers, reels and shared posts are not read (the system answers those itself). Never offer, mention or ask for voice notes on Instagram.
+- MESSAGES: on Instagram you read typed text AND voice messages. A voice message in English, French, Spanish or Arabic is transcribed automatically and reaches you as text marked "(voice note, auto-transcribed - detected language: ...)". You ALWAYS reply in text (never audio), in the language the customer used. Photos, videos, stickers, reels and shared posts are not read (the system answers those itself).
+- A VOICE MESSAGE NEVER CONFIRMS: a spoken "yes" can never confirm a booking, a cancellation or a reschedule. When the system asks the customer to confirm, they must TYPE their answer.
 - Instagram shows plain text only: never use markdown such as *bold*, _italic_ or # headings.`;
 
 // Messenger -> Instagram wording in every non-code string of the workflow.
@@ -340,7 +465,11 @@ function build() {
   wf.pinData = {};
   wf.tags = [];
 
-  // ---- Instagram has no voice path: remove it (and the Messenger split nodes, rebuilt below).
+  // ---- Messenger's single-language Cohere voice path and split nodes are replaced
+  // (the Instagram voice path is rebuilt below at the same canvas positions).
+  const VP = {};
+  for (const n of ['Download Voice Binary', 'Name Voice File', 'Cohere Transcribe', 'Merge Voice Text', 'Send Voice Failed Reply']) VP[n] = must(wf, n).position.slice();
+  const mergeTextNode = JSON.parse(JSON.stringify(must(wf, 'Merge Text Message')));
   for (const n of ['Download Voice Binary', 'Name Voice File', 'Cohere Transcribe', 'Merge Voice Text', 'Send Voice Failed Reply', 'Has Second Part?', 'Send Messenger Reply (part 2)']) remove(wf, n);
   rename(wf, 'Messenger Webhook (verify)', 'Instagram Webhook (verify)');
   rename(wf, 'Messenger Webhook', 'Instagram Webhook');
@@ -355,7 +484,7 @@ function build() {
   vt.leftValue = replaceOnce(replaceOnce(vt.leftValue, '!!$env.LUMIERE_MESSENGER_VERIFY_TOKEN', '!!$env.LUMIERE_INSTAGRAM_VERIFY_TOKEN', 'verify token 1'),
     "=== $env.LUMIERE_MESSENGER_VERIFY_TOKEN", "=== $env.LUMIERE_INSTAGRAM_VERIFY_TOKEN", 'verify token 2');
   must(wf, 'Verify Signature & Split').parameters.jsCode = VERIFY_CODE;
-  must(wf, 'Setup Note').parameters.content = '## ' + SALON.name + ' - Yasmine on Instagram Direct\nSetup: see INSTAGRAM-SETUP.md.\n\nWebhook URL for Meta (object "instagram", field "messages"): `<n8n>/webhook/' + WEBHOOK_PATH + '`\nEnv: LUMIERE_INSTAGRAM_VERIFY_TOKEN, LUMIERE_INSTAGRAM_APP_SECRET, LUMIERE_INSTAGRAM_ACCOUNT_ID (+ LUMIERE_WHATSAPP_* / LUMIERE_STAFF_CHAT_ID for staff alerts).\nCredential: Header Auth "' + ENV.credentials.instagram.name + '" (Page token with instagram_manage_messages).\n\nText only. Replies only inside the 24-hour window. Every message is processed in its own execution starting at **Instagram Event**.\nGenerated by tools/build-instagram.js - do not edit by hand.';
+  must(wf, 'Setup Note').parameters.content = '## ' + SALON.name + ' - Yasmine on Instagram Direct\nSetup: see INSTAGRAM-SETUP.md.\n\nWebhook URL for Meta (object "instagram", field "messages"): `<n8n>/webhook/' + WEBHOOK_PATH + '`\nEnv: LUMIERE_INSTAGRAM_VERIFY_TOKEN, LUMIERE_INSTAGRAM_APP_SECRET, LUMIERE_INSTAGRAM_ACCOUNT_ID (+ LUMIERE_WHATSAPP_* / LUMIERE_STAFF_CHAT_ID for staff alerts).\nCredential: Header Auth "' + ENV.credentials.instagram.name + '" (Page token with instagram_manage_messages).\nVoice messages: Header Auth "' + ENV.credentials.transcription.name + '" (OpenRouter speech-to-text, ' + VOICE.model + ', automatic language detection: English, French, Spanish, Arabic).\n\nText and voice messages in; replies are always text. Replies only inside the 24-hour window. Every message is processed in its own execution starting at **Instagram Event**.\nGenerated by tools/build-instagram.js - do not edit by hand.';
 
   // ---- intake
   must(wf, 'Dedup & Filter Prep').parameters.jsCode = DEDUP_CODE;
@@ -363,12 +492,45 @@ function build() {
   const prof = must(wf, 'Get Instagram Profile');
   prof.parameters.url = '=' + GRAPH + "/{{ " + D + ".chatId }}?fields=name,username";
   prof.credentials = IG_CRED;
-  conn(wf, 'Message Type Router', [['Merge Text Message'], ['Send Unsupported Reply'], ['Send Unsupported Reply']]);
-  // Only typed text reaches the confirmation gate (no voice path on Instagram).
+  // ---- voice messages: Meta CDN download -> real-format check -> OpenRouter speech-to-text
+  // (automatic language detection) -> Read Transcript -> "Merge Voice Text" -> Confirmation Gate.
+  // The node name "Merge Voice Text" is what the gate (viaVoice) and the Run Confirmed nodes
+  // (confirm_via) check: a transcribed message can never confirm a change (engine: not_typed).
+  put(wf, { parameters: { url: '={{ ' + D + '.mediaUrl }}', options: { timeout: VOICE.downloadTimeoutMs, response: { response: { responseFormat: 'file' } } } },
+    name: 'Download Voice Binary', type: 'n8n-nodes-base.httpRequest', typeVersion: 4.2, position: VP['Download Voice Binary'], retryOnFail: true, maxTries: 2, waitBetweenTries: 1000, onError: 'continueErrorOutput' });
+  put(wf, { parameters: { jsCode: CHECK_VOICE_CODE }, name: 'Check Voice File', type: 'n8n-nodes-base.code', typeVersion: 2, position: VP['Name Voice File'], onError: 'continueErrorOutput' });
+  put(wf, { parameters: {
+    method: 'POST', url: VOICE.url, authentication: 'genericCredentialType', genericAuthType: 'httpHeaderAuth',
+    sendBody: true, contentType: 'multipart-form-data',
+    bodyParameters: { parameters: [
+      { name: 'model', value: VOICE.model },
+      { name: 'response_format', value: 'verbose_json' },
+      { name: 'temperature', value: '0' },
+      { parameterType: 'formBinaryData', name: 'file', inputDataFieldName: 'data' },
+    ] },
+    options: { timeout: VOICE.transcribeTimeoutMs },
+  }, name: 'Transcribe Voice', type: 'n8n-nodes-base.httpRequest', typeVersion: 4.2, position: VP['Cohere Transcribe'], credentials: STT_CRED, retryOnFail: true, maxTries: 2, waitBetweenTries: 2000, onError: 'continueErrorOutput' });
+  const vm = VP['Merge Voice Text'];
+  put(wf, { parameters: { jsCode: READ_TRANSCRIPT_CODE }, name: 'Read Transcript', type: 'n8n-nodes-base.code', typeVersion: 2, position: [vm[0] - 220, vm[1] + 160], onError: 'continueErrorOutput' });
+  put(wf, boolIf('Voice Usable?', 'ig-voice-usable', '={{ $json.usable === true }}', [vm[0] - 110, vm[1] + 320]));
+  const mergeVoice = Object.assign(mergeTextNode, { name: 'Merge Voice Text', position: vm });
+  mergeVoice.parameters.assignments.assignments = [{ id: 'ig-voice-user-text', name: 'userText', value: '={{ $json.text }}', type: 'string' }];
+  put(wf, mergeVoice);
+  put(wf, igSend('Send Voice Failed Reply', VP['Send Voice Failed Reply'], JSON.stringify(VOICE_FAILED_TEXT), { onError: 'continueRegularOutput' }));
+  conn(wf, 'Message Type Router', [['Merge Text Message'], ['Download Voice Binary'], ['Send Unsupported Reply']]);
+  conn(wf, 'Download Voice Binary', [['Check Voice File'], ['Send Voice Failed Reply']]);
+  conn(wf, 'Check Voice File', [['Transcribe Voice'], ['Send Voice Failed Reply']]);
+  conn(wf, 'Transcribe Voice', [['Read Transcript'], ['Send Voice Failed Reply']]);
+  conn(wf, 'Read Transcript', [['Voice Usable?'], ['Send Voice Failed Reply']]);
+  conn(wf, 'Voice Usable?', [['Merge Voice Text'], ['Send Voice Failed Reply']]);
+  conn(wf, 'Merge Voice Text', [['Confirmation Gate']]);
+  conn(wf, 'Send Voice Failed Reply', [['Chat Lock: Release']]);
+  // The gate and the Run Confirmed nodes keep the WhatsApp checks unchanged (Merge Voice Text).
   const gate = must(wf, 'Confirmation Gate');
-  gate.parameters.jsCode = replaceOnce(gate.parameters.jsCode, "try { viaVoice = $('Merge Voice Text').isExecuted === true; } catch (e) { viaVoice = false; } // the website has no voice path",
-    '// Instagram is text only (no voice path): viaVoice stays false', 'gate voice check');
-  for (const n of ['Run Confirmed Cancel', 'Run Confirmed Reschedule']) must(wf, n).parameters.workflowInputs.value.confirm_via = 'text';
+  if (gate.parameters.jsCode.indexOf("viaVoice = $('Merge Voice Text').isExecuted === true") < 0) throw new Error('build-instagram: the confirmation gate no longer checks Merge Voice Text');
+  for (const n of ['Run Confirmed Cancel', 'Run Confirmed Reschedule']) {
+    if (must(wf, n).parameters.workflowInputs.value.confirm_via !== "={{ $('Merge Voice Text').isExecuted ? 'voice' : 'text' }}") throw new Error('build-instagram: ' + n + ' no longer reports voice confirmations');
+  }
 
   // ---- profile name: Instagram gives name and username
   const PN_IG = "($('Get Instagram Profile').isExecuted ? String($('Get Instagram Profile').first().json.name || ($('Get Instagram Profile').first().json.username ? '@' + $('Get Instagram Profile').first().json.username : '')) : '')";
@@ -381,9 +543,9 @@ function build() {
   agent.parameters.options.systemMessage = replaceOnce(agent.parameters.options.systemMessage, MB.MESSENGER_RULES, IG_RULES, 'instagram rules');
   for (const n of wf.nodes) if (!IS_CODE(n)) n.parameters = walkStrings(n.parameters, tx);
   if (!VOICE_MARKER.test(agent.parameters.text)) throw new Error('build-instagram: AI Agent text has no voice-note marker');
-  agent.parameters.text = agent.parameters.text.replace(VOICE_MARKER, '');
+  agent.parameters.text = agent.parameters.text.replace(VOICE_MARKER, () => IG_VOICE_MARKER);
   agent.parameters.text = replaceOnce(agent.parameters.text, "Channel: Instagram (the customer's phone number is not visible on this channel)",
-    "Channel: Instagram Direct, text only (the customer's phone number is not visible on this channel)", 'agent channel');
+    "Channel: Instagram Direct, text and voice messages, replies in text (the customer's phone number is not visible on this channel)", 'agent channel');
   must(wf, 'Simple Memory').parameters.sessionKey = "={{ " + D + ".customerKey }}_v1_lumiere_salon"; // ig:<account>:<igsid>_v1_...
   const esc = must(wf, 'Escalate to Staff');
   esc.parameters.jsonBody = replaceOnce(esc.parameters.jsonBody, "Reply from the Instagram inbox (Meta Business Suite).", "Reply from the Instagram inbox (Meta Business Suite) within 24 h of the customer\\'s last message.", 'escalate 24h');
@@ -414,6 +576,7 @@ function build() {
   guardWindow(wf, 'Send Instagram Reply', ['Log Conversation']);
   guardWindow(wf, 'Send Fallback Reply', ['Alert Staff - System Error']);
   guardWindow(wf, 'Send Unsupported Reply', ['Chat Lock: Release']);
+  guardWindow(wf, 'Send Voice Failed Reply', ['Chat Lock: Release']);
 
   // ---- wiring of the receiver
   conn(wf, 'Instagram Webhook (verify)', [['Verify Token OK?']]);
@@ -449,4 +612,4 @@ if (require.main === module) {
     if (prev !== next) process.exit(1);
   } else if (prev !== next) { fs.writeFileSync(file, next); console.log('updated: ' + OUT_FILE); } else console.log('instagram workflow up to date');
 }
-module.exports = { build, OUT_FILE, NAME, WF_ID, WEBHOOK_PATH, IG_MAX_BYTES, IG_MAX_PARTS, WINDOW_MS, SEND_URL, DISCLOSURE, UNSUPPORTED_TEXT, TAG };
+module.exports = { build, OUT_FILE, NAME, WF_ID, WEBHOOK_PATH, IG_MAX_BYTES, IG_MAX_PARTS, WINDOW_MS, SEND_URL, DISCLOSURE, UNSUPPORTED_TEXT, VOICE_FAILED_TEXT, VOICE, MEDIA_HOST_RE, TAG };

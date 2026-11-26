@@ -77,6 +77,7 @@ for (const m of [
   'n8n environment variables set (salon values, NOT the clinic ones): ' + env.join(', '),
   'Salon WhatsApp Business number on its own Meta app (not the clinic number); webhook not shared with the clinic',
   '(Instagram) n8n credential "' + ENV.credentials.instagram.name + '" created with id ' + ENV.credentials.instagram.id + ' (Header Auth, Bearer <salon Page token with instagram_manage_messages>) - see INSTAGRAM-SETUP.md',
+  '(Instagram voice messages) n8n credential "' + ENV.credentials.transcription.name + '" created with id ' + ENV.credentials.transcription.id + ' (Header Auth, Name Authorization, Value Bearer <a salon-only OpenRouter key with a spending limit>) - never the clinic key; see INSTAGRAM-SETUP.md',
   '(Instagram) salon Instagram professional account linked to the salon Facebook Page, on the SALON Meta app (verified to be separate from every clinic app); "Allow access to messages" on; Instagram webhook -> /webhook/' + ENV.INSTAGRAM_WEBHOOK_PATH + ' (Messenger webhook unchanged)',
   'Error workflow, tool workflows, then main workflows imported - all arrive inactive; no clinic workflow selected or edited',
 ]) console.log('  [ ] ' + m);

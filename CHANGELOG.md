@@ -1,5 +1,35 @@
 # CHANGELOG — Lumière Hair & Beauty Studio AI Receptionist
 
+## Instagram: multilingual voice messages (2026-11-26)
+
+Instagram moves from text-only to text **and voice** input in English, French, Spanish and Arabic, with the language detected automatically. Replies stay text-only. Nothing was imported or published; the Instagram workflow stays inactive.
+
+- **Provider:** OpenRouter speech-to-text (`POST /api/v1/audio/transcriptions`, model `openai/whisper-large-v3`, `response_format=verbose_json`, no `language` sent, so it is auto-detected and returned).
+  - Cohere (WhatsApp/Messenger) was not reused: its docs say `language` is required and it "does not feature explicit, automatic language detection". It also doesn't list m4a/mp4/aac.
+  - New salon-only credential `LUMIERE - OpenRouter Transcription` (`lumOrTranscribe1`). It is never shared with other bots, and WhatsApp/Messenger don't use it.
+- **Voice path** (`tools/build-instagram.js`): Message Type Router → `Download Voice Binary` → `Check Voice File` → `Transcribe Voice` → `Read Transcript` → `Voice Usable?` → `Merge Voice Text` → Confirmation Gate.
+  - **Download:** only HTTPS links on Meta's media CDN (`fbsbx.com`, `fbcdn.net`, `cdninstagram.com`); no token is sent; 20 s timeout.
+  - **Format:** the real format is read from the first bytes (M4A/MP4, AAC, Ogg, WebM, WAV, MP3, FLAC), not from the URL or content type. Files of 1 KB–10 MB only.
+  - **Language:** Whisper's language is cross-checked with the text detector in `confirm.js`. If they disagree, the language is marked UNCERTAIN, and Yasmine follows the transcript's language or asks the customer to type.
+  - **Refused:** empty audio, the stock phrases Whisper invents for silence, and languages other than the four.
+  - **Failure reply:** every failure (download, format, size, provider, unusable transcript) gets a 4-language "please try again or type" reply through the 24-hour-window guard. Nothing technical is shown.
+- **Safety unchanged:** the node name `Merge Voice Text` keeps the existing gate check (`viaVoice`) and `confirm_via`. A spoken "yes" never confirms (the customer is asked to type), and the engine refuses `confirm_via=voice` (`not_typed`). The overrides that forced "text only" on Instagram are removed, and the build now fails if either check disappears.
+- **Prompt and texts:** the Instagram rules say voice messages are read and replies are always text. The per-message marker gives the detected language instead of the WhatsApp "only Spanish" wording. The unsupported-attachment reply now says text and voice are read.
+- **Emulator:** Code nodes get `this.helpers.getBinaryDataBuffer`; HTTP nodes record multipart form fields and file parts.
+- **Tests:**
+  - `tests/instagram.test.js` IV1–IV11, **mocked provider**:
+    - four languages, including Arabic script;
+    - language detection and uncertainty, and the language of the server's replies;
+    - download failure and non-Meta links;
+    - six audio formats, plus non-audio, too-small and too-large files;
+    - empty or unintelligible transcripts and provider failure;
+    - duplicate delivery and cross-customer isolation;
+    - a spoken yes refused (English, Spanish, Arabic) and a typed yes still confirming, plus the engine's own refusal.
+  - `tests/integration/instagram-voice-real.js` (not in `npm test`):
+    - **part A:** real WAV and real AAC/MP4 audio (Windows voice, re-encoded by Windows Media Foundation) through the real workflow, with the provider mocked;
+    - **part B:** the real OpenRouter text-to-speech and speech-to-text, run only with a test key in `.env.openrouter-test` (git-ignored).
+  - `npm test`: 16 suites, 290 tests.
+
 ## Prompt: read back services, total length and price; only checked alternatives (2026-11-25)
 
 Nothing was imported or published.

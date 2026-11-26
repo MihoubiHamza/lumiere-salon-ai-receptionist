@@ -101,6 +101,7 @@ Instagram Direct (optional): in the same salon app (verify first that it is not 
 | `LUMIERE - WhatsApp API` | WhatsApp API | permanent token (step 4.4) + WhatsApp Business Account ID | all WhatsApp send nodes, error workflow |
 | `LUMIERE - Facebook Page Token` | Header Auth | Name `Authorization` (pre-filled), Value `Bearer <salon Page token>` | Messenger send/profile nodes |
 | `LUMIERE - Instagram Page Token` (id `lumIgPageToken01`) | Header Auth | Name `Authorization`, Value `Bearer <salon Page token with instagram_manage_messages>` | Instagram send/profile nodes |
+| `LUMIERE - OpenRouter Transcription` (id `lumOrTranscribe1`) | Header Auth | Name `Authorization`, Value `Bearer <salon-only OpenRouter key with a spending limit>` | Instagram `Transcribe Voice` (voice messages, automatic language detection) |
 
 The first three `LUMIERE - …` credentials were created empty in n8n with these exact ids, so every node is already linked: open each one under **Credentials** and fill it in. **`LUMIERE - Instagram Page Token` does not exist in n8n yet**: create it with exactly this name and id before importing the Instagram workflow (`INSTAGRAM-SETUP.md` step 2).
 
@@ -161,7 +162,7 @@ Run `node tools/preflight.js` first: it ticks the offline items and exits with a
 - [ ] `websiteDemo.CALENDAR_ID` = the new `Lumière Demo` calendar, different from the salon calendar
 - [ ] `websiteDemo.PUBLIC_WEBHOOK_URL` = `https://<n8n>/webhook/lumiere-website-demo`; `ALLOWED_ORIGINS` = the website's origin
 - [ ] Builds re-run after editing; `node tools/preflight.js` says "Offline checks passed"
-- [ ] `cd tests; npm test` → ALL SUITES PASSED (279 tests)
+- [ ] `cd tests; npm test` → ALL SUITES PASSED (290 tests)
 
 **Google (manual)**
 - [ ] Both calendars exist, and the n8n Google accounts can **make changes to events** on them

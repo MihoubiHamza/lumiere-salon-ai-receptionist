@@ -196,20 +196,27 @@ class Runner {
     base.$getWorkflowStaticData = this.getStatic();
     base.console = { log() {}, warn() {}, error() {} };
     delete base.$fromAI;
+    // n8n Code node helper: the bytes of an item's binary property (binary data is base64 in `data`).
+    const self = { helpers: { getBinaryDataBuffer: async (i, prop) => {
+      const b = items[i] && items[i].binary && items[i].binary[prop];
+      if (!b) throw new Error('No binary data with the property "' + prop + '" on item ' + i);
+      if (Buffer.isBuffer(b.bytes)) return b.bytes;
+      return Buffer.from(String(b.data || ''), 'base64');
+    } } };
     const names = Object.keys(base);
     if (mode === 'runOnceForEachItem') {
       const out = [];
       for (const item of items) {
         const ctx = Object.assign({}, base, { $json: item.json, $input: Object.assign({}, base.$input, { item }) });
         const fn = new AsyncFunction(...names, src);
-        const r = await fn(...names.map((k) => ctx[k]));
+        const r = await fn.call(self, ...names.map((k) => ctx[k]));
         if (r == null) continue;
         out.push(r.json ? r : { json: r });
       }
       return out;
     }
     const fn = new AsyncFunction(...names, src);
-    const r = await fn(...names.map((k) => base[k]));
+    const r = await fn.call(self, ...names.map((k) => base[k]));
     if (r == null) return [];
     if (!Array.isArray(r)) throw new Error('Code node ' + node.name + ' must return an array');
     return r.map((x) => (x && x.json ? x : { json: x }));
@@ -294,6 +301,16 @@ class Runner {
       const literalTrue = (v) => v === true;
       if (literalTrue(p.sendHeaders) && p.specifyHeaders === 'json') req.headers = JSON.parse(this.evalExpr(p.jsonHeaders, ctx) || '{}');
       if (literalTrue(p.sendBody) && p.specifyBody === 'json') req.body = JSON.parse(this.evalExpr(p.jsonBody, ctx));
+      // multipart/form-data: plain fields and file parts (formBinaryData) as n8n would send them.
+      if (literalTrue(p.sendBody) && p.contentType === 'multipart-form-data') {
+        req.form = ((p.bodyParameters && p.bodyParameters.parameters) || []).map((f) => {
+          if (f.parameterType !== 'formBinaryData') return { name: f.name, value: String(this.evalExpr(f.value, ctx)) };
+          const b = item.binary && item.binary[f.inputDataFieldName];
+          if (!b) throw new Error('runner: no binary property ' + f.inputDataFieldName + ' for form field ' + f.name);
+          return { name: f.name, file: { fileName: b.fileName, mimeType: b.mimeType, bytes: Buffer.isBuffer(b.bytes) ? b.bytes : Buffer.from(String(b.data || ''), 'base64') } };
+        });
+      }
+      req.credentials = node.credentials || null;
       const hook = this.env.hooks.http;
       if (!hook) throw new Error('runner: no http hook');
       const resp = await hook(req, this, item); // may throw (transport)

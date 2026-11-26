@@ -23,7 +23,7 @@ It uses **Instagram messaging through the Messenger Platform** ("Instagram API w
 | Double-booking protection | calendar write lock | same lock | **same lock** |
 | Customer identity (customer key) | `wa:<number>` | `fb:<page_id>:<psid>` | `ig:<instagram_account_id>:<igsid>` |
 | Customer's phone number | automatic | Yasmine asks for it | Yasmine asks for it (`Instagram - Tel: …` in the notes) |
-| Message types | text + voice | text + voice | **text only**; voice notes and attachments get a friendly "please type" reply |
+| Message types | text + voice (one configured language) | text + voice (one configured language) | **text + voice in English, French, Spanish and Arabic** (language detected automatically); replies are always text; photos, videos, stickers, reels and shared posts get a friendly "text or voice" reply |
 | Reply length | WhatsApp | split at 2000 characters | split into parts of **at most 990 UTF-8 bytes** (fewer than 1,000 characters) |
 | 24-hour window | — | — | **enforced before every send** |
 | Automated-assistant disclosure | — | — | first reply of each conversation window, and on every fixed reply |
@@ -101,6 +101,22 @@ Meta lists `business_management` as a dependency of `instagram_manage_messages`.
 
 This is a separate credential from `LUMIERE - Facebook Page Token`, so either can be rotated or revoked on its own. It may hold the same Page token. The build, tests and preflight refuse to share it with the other bots.
 
+### 2b. Voice messages: speech-to-text credential (new)
+Instagram voice messages are transcribed by **OpenRouter speech-to-text** (`openai/whisper-large-v3`), which detects the spoken language automatically (English, French, Spanish, Arabic). Cohere, used on WhatsApp and Messenger, needs one fixed language and is not used here.
+1. In OpenRouter, create a **salon-only API key** with a **spending limit** (for example a few euros per month). Never reuse another bot's key.
+2. **Credentials → Add credential → Header Auth**, with exactly this name and id:
+   - Name: `LUMIERE - OpenRouter Transcription`, id `lumOrTranscribe1`
+   - Header Name: `Authorization`
+   - Value: `Bearer <the salon OpenRouter key>`
+
+How a voice message is handled:
+- The audio link in Meta's webhook is a pre-signed link on Meta's media CDN. It is downloaded **only** if it is HTTPS on `fbsbx.com`, `fbcdn.net` or `cdninstagram.com`, and **no token is ever sent to it**.
+- The real audio format is read from the file's first bytes (M4A/MP4, AAC, Ogg, WebM, WAV, MP3, FLAC). Files under 1 KB or over 10 MB, and anything that is not audio, get the friendly reply.
+- The transcript reaches Yasmine as the customer's message, marked as a voice note with the detected language. She replies in text in that language; if the audio language and the transcript disagree, she follows the transcript's language or asks the customer to type.
+- Empty or unintelligible audio, a language other than the four, a failed download or a failed transcription: the customer gets "Sorry, I couldn't understand this voice message. Please try again or type your message." in four languages. Nothing technical is ever shown.
+- **A voice message never confirms** a booking, cancellation or reschedule: a spoken "yes" gets "For your security, a voice message cannot confirm this change. Please type Yes or No."
+- Cost: about $0.00045 per minute of audio (OpenRouter list price, 2026-11-26) plus the normal AI reply.
+
 ### 3. n8n environment variables (then restart n8n)
 | Variable | Value |
 |---|---|
@@ -121,10 +137,10 @@ Staff alerts reuse `LUMIERE_WHATSAPP_PHONE_NUMBER_ID`, `LUMIERE_WHATSAPP_ACCESS_
 
 ## Test checklist (from an Instagram account that has a role on the app)
 1. Send "Hello". Yasmine answers in English. The first reply starts with the automated-assistant disclosure.
-2. Send a voice message and a photo. Each time you should get "please type your message", with no voice-note promise.
+2. Send a voice message in each language (English, French, Spanish, Arabic): Yasmine answers in text, in that language. Send a photo: you get the "text or voice" reply. **Before going live, this real-device test is required**: Meta does not document the audio format of received Instagram voice messages, so check in n8n **Executions** that `Check Voice File` recognised it and `Transcribe Voice` succeeded.
 3. Book an appointment. Yasmine asks for your mobile number. The calendar event starts with `Customer: ig:…` and the notes with `Instagram - Tel: …`.
 4. Ask "when is my appointment?" It is found. From Messenger or WhatsApp it is **not** found automatically.
-5. Ask to cancel. The **server** asks Yes/No. Answer "yes" and it is cancelled.
+5. Ask to cancel. The **server** asks Yes/No. Answer with a **voice** "yes": nothing is cancelled and you are asked to type. Then type "yes": it is cancelled.
 6. Ask for a person. Staff get a WhatsApp alert marked `[Instagram]`, and the bot stays silent. Then set the `ig:…` row in `Active_Handoffs` to `unmuted`.
 7. In n8n **Executions**: a run ending at `Rejected - Bad Signature` means `LUMIERE_INSTAGRAM_APP_SECRET` or `LUMIERE_INSTAGRAM_ACCOUNT_ID` is wrong or missing.
 

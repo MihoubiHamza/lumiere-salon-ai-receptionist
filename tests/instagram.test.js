@@ -39,15 +39,49 @@ function env(o) {
   const e = makeEnv(Object.assign({ ai: { behave: () => ({ output: REPLY }) } }, o));
   Object.assign(e.envVars, { LUMIERE_INSTAGRAM_APP_SECRET: SECRET, LUMIERE_INSTAGRAM_VERIFY_TOKEN: VERIFY, LUMIERE_INSTAGRAM_ACCOUNT_ID: ACCT,
     LUMIERE_MESSENGER_APP_SECRET: SECRET, LUMIERE_MESSENGER_VERIFY_TOKEN: 'messenger-token' });
-  Object.assign(e.rec, { responses: [], igReqs: [], execs: [] });
+  Object.assign(e.rec, { responses: [], igReqs: [], execs: [], downloads: [], stt: [] });
   e.pending = [];
+  e.voice = { bytes: AUDIO.m4a, mime: 'audio/mp4', result: STT.en };
   return e;
 }
+// ---- voice fixtures (MOCKED provider). Audio bytes start with each format's real signature.
+const padTo = (head, n) => Buffer.concat([head, Buffer.alloc(Math.max(0, n - head.length), 7)]);
+const AUDIO = {
+  m4a: padTo(Buffer.concat([Buffer.from([0, 0, 0, 0x1c]), Buffer.from('ftypM4A \0\0\0\0isomM4A mp42', 'latin1')]), 6000),
+  ogg: padTo(Buffer.from('OggS\0\x02\0\0', 'latin1'), 5000),
+  aac: padTo(Buffer.from([0xff, 0xf1, 0x50, 0x80, 0x01, 0x1f, 0xfc]), 5000),
+  webm: padTo(Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 0x9f, 0x42, 0x86, 0x81]), 5000),
+  wav: padTo(Buffer.from('RIFF\0\0\0\0WAVEfmt ', 'latin1'), 5000),
+  mp3: padTo(Buffer.from('ID3\x04\0\0\0\0', 'latin1'), 5000),
+  pdf: padTo(Buffer.from('%PDF-1.7\n', 'latin1'), 5000), // not audio
+  tiny: Buffer.concat([Buffer.from([0, 0, 0, 0x1c]), Buffer.from('ftypM4A ', 'latin1')]),
+};
+const STT = {
+  en: { text: "Hi, I'd like to book a women's haircut tomorrow at 10 am.", language: 'english', duration: 3.9 },
+  fr: { text: "Bonjour, je voudrais réserver une coupe femme demain à 10 heures, s'il vous plaît.", language: 'french', duration: 4.4 },
+  es: { text: 'Hola, quiero reservar un corte de mujer mañana a las diez, por favor.', language: 'spanish', duration: 4.1 },
+  ar: { text: 'مرحبا، أريد حجز قص شعر نسائي غدا الساعة العاشرة من فضلك.', language: 'arabic', duration: 4.6 },
+};
+const CDN = 'https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=';
 function hooks(e, wf) {
   const channel = wf === MSG ? 'messenger' : 'instagram';
   const h = H._mainHooks(e);
   const baseHttp = h.http;
   h.http = async (req, run) => {
+    // Meta media CDN (voice download) - MOCKED.
+    if (typeof req.url === 'string' && req.url.indexOf(CDN) === 0) {
+      await e.sim.sleep(80);
+      e.rec.downloads.push({ url: req.url, headers: req.headers, credentials: req.credentials, method: req.method });
+      if (e.faults.voiceDownload) throw new Error('Request failed with status code 403');
+      return { statusCode: 200, binary: { data: { fileName: 'audioclip-1.mp4', mimeType: e.voice.mime, data: e.voice.bytes.toString('base64') } } };
+    }
+    // OpenRouter speech-to-text - MOCKED.
+    if (req.url === IB.VOICE.url) {
+      await e.sim.sleep(e.faults.sttMs || 1200);
+      e.rec.stt.push({ method: req.method, form: req.form, credentials: req.credentials, chat: run.accessor()('Dedup & Filter Prep').first().json.customerKey });
+      if (e.faults.stt) throw new Error('Request failed with status code 502');
+      return { statusCode: 200, body: typeof e.voice.result === 'function' ? e.voice.result(req, run) : e.voice.result };
+    }
     if (req.url === SEND) {
       await e.sim.sleep(60);
       const to = req.body.recipient.id, text = req.body.message.text;
@@ -262,7 +296,7 @@ test('IG4 every customer path releases the chat lock; every message to the custo
     for (const x of nx) stack.push(x);
   }
   const sends = w.nodes.filter((n) => n.parameters && n.parameters.url === SEND);
-  assert.strictEqual(sends.length, 2 + IB.IG_MAX_PARTS, 'unsupported, fallback and the reply parts');
+  assert.strictEqual(sends.length, 3 + IB.IG_MAX_PARTS, 'unsupported, voice failed, fallback and the reply parts');
   const parents = (t) => Object.keys(w.connections).filter((s) => next(s).indexOf(t) >= 0);
   for (const s of sends) {
     assert.ok(seen.has(s.name), s.name + ' not on a lock-protected path');
@@ -271,13 +305,13 @@ test('IG4 every customer path releases the chat lock; every message to the custo
     }
   }
   const guards = w.nodes.filter((n) => /^24h Window Open\? \(/.test(n.name));
-  assert.deepStrictEqual(guards.map((n) => n.name.slice('24h Window Open? ('.length, -1)).sort(), ['Send Fallback Reply', 'Send Instagram Reply', 'Send Unsupported Reply']);
+  assert.deepStrictEqual(guards.map((n) => n.name.slice('24h Window Open? ('.length, -1)).sort(), ['Send Fallback Reply', 'Send Instagram Reply', 'Send Unsupported Reply', 'Send Voice Failed Reply']);
   for (const g of guards) assert.strictEqual(g.parameters.conditions.conditions[0].leftValue, "={{ Number($('Dedup & Filter Prep').first().json.msgTs) > 0 && Date.now() - Number($('Dedup & Filter Prep').first().json.msgTs) < " + IB.WINDOW_MS + ' }}');
   assert.ok(IB.WINDOW_MS < 24 * 3600000);
   assert.deepStrictEqual(w.connections['Dedup & Filter Prep'].main, [[{ node: 'Chat Lock: Acquire', type: 'main', index: 0 }]]);
 });
 
-test('IG5 tools: same sub-workflows, identity = verified ig: key (never the AI), text only, automated-assistant rules in the prompt', () => {
+test('IG5 tools: same sub-workflows, identity = verified ig: key (never the AI), text + voice in / text out, automated-assistant rules in the prompt', () => {
   for (const tool of ['Book_Appointment', 'Cancel_Appointment', 'Reschedule_Appointment', 'Find_Patient_Appointments', 'Check_Availability']) {
     const m = byNode(IG, tool), wa = byNode(WA, tool);
     assert.strictEqual(m.parameters.workflowId.value, wa.parameters.workflowId.value, tool + ' must call the same sub-workflow');
@@ -289,19 +323,24 @@ test('IG5 tools: same sub-workflows, identity = verified ig: key (never the AI),
   }
   for (const n of ['Run Confirmed Cancel', 'Run Confirmed Reschedule']) {
     const v = byNode(IG, n).parameters.workflowInputs.value;
-    assert.strictEqual(v.customer_key, WB.CUSTOMER_KEY_EXPR); assert.strictEqual(v.phone_number, ''); assert.strictEqual(v.confirm_via, 'text');
+    assert.strictEqual(v.customer_key, WB.CUSTOMER_KEY_EXPR); assert.strictEqual(v.phone_number, '');
+    assert.strictEqual(v.confirm_via, "={{ $('Merge Voice Text').isExecuted ? 'voice' : 'text' }}", n + ': a transcribed message is reported as voice (never a typed confirmation)');
   }
   assert.ok(/Instagram - Tel:/.test(byNode(IG, 'Book_Appointment').parameters.workflowInputs.value.notes));
-  for (const n of ['Cohere Transcribe', 'Download Voice Binary', 'Merge Voice Text', 'Name Voice File', 'Send Voice Failed Reply']) assert.ok(!byNode(IG, n), n + ' must not exist: Instagram is text only');
+  for (const n of ['Cohere Transcribe', 'Name Voice File']) assert.ok(!byNode(IG, n), n + ': the single-language Cohere path is not used on Instagram');
+  for (const n of ['Download Voice Binary', 'Check Voice File', 'Transcribe Voice', 'Read Transcript', 'Voice Usable?', 'Merge Voice Text', 'Send Voice Failed Reply']) assert.ok(byNode(IG, n), n + ' is part of the Instagram voice path');
   const prompt = byNode(IG, 'AI Agent').parameters.options.systemMessage;
   assert.ok(prompt.indexOf('## INSTAGRAM DIRECT CHANNEL') > 0 && prompt.indexOf('AI Instagram receptionist') > 0);
-  assert.ok(/TEXT ONLY: on Instagram you can only read typed text/.test(prompt) && /Never offer, mention or ask for voice notes/.test(prompt));
+  assert.ok(/MESSAGES: on Instagram you read typed text AND voice messages/.test(prompt) && /You ALWAYS reply in text \(never audio\)/.test(prompt), 'voice in, text out');
+  assert.ok(/A VOICE MESSAGE NEVER CONFIRMS/.test(prompt) && /they must TYPE their answer/.test(prompt));
+  assert.ok(!/TEXT ONLY: on Instagram/.test(prompt));
   assert.ok(/YOU ARE AN AUTOMATED AI ASSISTANT: never claim or imply that you are a human/.test(prompt) && /real person, a human or the team, call Escalate_to_Staff/.test(prompt));
   assert.ok(!/Messenger|Facebook account|Facebook Page/.test(prompt.split('on Facebook Messenger').join('')), 'prompt still describes Messenger');
   const waPrompt = byNode(WA, 'AI Agent').parameters.options.systemMessage;
   for (const h of waPrompt.match(/^##.*$/gm)) assert.ok(prompt.indexOf(h.replace('WHATSAPP', 'INSTAGRAM')) >= 0, 'lost prompt section ' + h);
   const text = byNode(IG, 'AI Agent').parameters.text;
-  assert.ok(text.indexOf('Channel: Instagram Direct, text only') > 0 && !/voice/i.test(text), text);
+  assert.ok(text.indexOf('Channel: Instagram Direct, text and voice messages, replies in text') > 0, text);
+  assert.ok(text.indexOf("detected language: ' + $('Read Transcript').first(0).json.voiceLangName") > 0 && !/ONLY supported in|auto-transcribed as /.test(text), 'multilingual voice marker, no single-language wording');
   assert.strictEqual(byNode(IG, 'Simple Memory').parameters.sessionKey, "={{ $('Dedup & Filter Prep').first().json.customerKey }}_v1_lumiere_salon");
 });
 
@@ -312,6 +351,9 @@ test('IG6 customers only ever receive Instagram messages (own credential, no Mes
   }
   const http = IG.nodes.filter((x) => x.type === 'n8n-nodes-base.httpRequest' && !/^Engine/.test(x.name));
   for (const n of http) {
+    // The voice download sends NO credential (pre-signed Meta CDN link); speech-to-text uses its own salon-only credential.
+    if (n.name === 'Download Voice Binary') { assert.ok(!n.credentials, n.name + ' must never send a token'); continue; }
+    if (n.name === 'Transcribe Voice') { assert.deepStrictEqual(n.credentials, { httpHeaderAuth: ENV.credentials.transcription }); continue; }
     assert.deepStrictEqual(n.credentials, { httpHeaderAuth: ENV.credentials.instagram }, n.name + ' must use the Instagram credential');
     if (n.parameters.url === SEND) {
       assert.ok(/recipient: \{ id: \$\('Dedup & Filter Prep'\)\.first\(\)\.json\.chatId \}/.test(n.parameters.jsonBody), n.name);
@@ -338,13 +380,15 @@ test('IG7 signature check: the embedded HMAC-SHA256 equals Node crypto (same cod
   }
 });
 
-test('IG8 fixed texts fit Instagram: at most 990 UTF-8 bytes, fewer than 1,000 characters, automated tag, no voice-note promise', () => {
-  const texts = [IB.UNSUPPORTED_TEXT].concat(Object.values(IB.DISCLOSURE));
+test('IG8 fixed texts fit Instagram: at most 990 UTF-8 bytes, fewer than 1,000 characters, automated tag; voice notes offered in four languages', () => {
+  const texts = [IB.UNSUPPORTED_TEXT, IB.VOICE_FAILED_TEXT].concat(Object.values(IB.DISCLOSURE));
   const fallback = JSON.parse(byNode(IG, 'Send Fallback Reply').parameters.jsonBody.match(/text: ("(?:[^"\\]|\\.)*")/)[1]);
   texts.push(fallback);
   for (const t of texts) { assert.ok(bytes(t) <= IB.IG_MAX_BYTES && t.length < 1000, t.slice(0, 40) + ': ' + bytes(t) + ' bytes'); }
-  for (const t of [IB.UNSUPPORTED_TEXT, fallback]) assert.ok(t.indexOf(IB.TAG) === 0, 'fixed replies say they are automated');
-  assert.ok(!/voice|vocal|voz|صوت/i.test(IB.UNSUPPORTED_TEXT), 'voice notes are not advertised on Instagram');
+  for (const t of [IB.UNSUPPORTED_TEXT, IB.VOICE_FAILED_TEXT, fallback]) assert.ok(t.indexOf(IB.TAG) === 0, 'fixed replies say they are automated');
+  for (const re of [/voice messages/, /mensajes de texto y de voz/, /écrits et vocaux/, /النصية والصوتية/]) assert.ok(re.test(IB.UNSUPPORTED_TEXT), 'the unsupported reply says text AND voice are read: ' + re);
+  for (const re of [/voice message/, /mensaje de voz/, /message vocal/, /الرسالة الصوتية/]) assert.ok(re.test(IB.VOICE_FAILED_TEXT), re);
+  assert.ok(!/https?:|error|token|openrouter|whisper|cdn/i.test(IB.VOICE_FAILED_TEXT + IB.UNSUPPORTED_TEXT), 'nothing technical in customer texts');
   for (const t of Object.values(IB.DISCLOSURE)) assert.ok(/^🤖 /.test(t));
   assert.ok(/automated AI assistant/.test(IB.DISCLOSURE.en) && /a person/.test(IB.DISCLOSURE.en));
 });
@@ -369,7 +413,7 @@ test('I2 signed text message -> one AI turn, disclosure + reply to that IGSID, i
   await all(e, [() => post(e, [ev(e, A, { text: 'Hi, how much is a haircut?' })])]);
   noErrors(e);
   assert.deepStrictEqual(aiFor(e, A).map((c) => c.text), ['Hi, how much is a haircut?']);
-  assert.ok(aiFor(e, A)[0].prompt.indexOf('Channel: Instagram Direct, text only') >= 0 && aiFor(e, A)[0].prompt.indexOf(A) < 0, 'the IGSID is never shown to the AI');
+  assert.ok(aiFor(e, A)[0].prompt.indexOf('Channel: Instagram Direct, text and voice messages, replies in text') >= 0 && aiFor(e, A)[0].prompt.indexOf('voice note') < 0 && aiFor(e, A)[0].prompt.indexOf(A) < 0, 'the IGSID is never shown to the AI');
   assert.deepStrictEqual(igTo(e, A).map((s) => [s.node, s.text]), [['Send Instagram Reply', IB.DISCLOSURE.en + '\n\n' + REPLY]]);
   assert.deepStrictEqual(Object.keys(igTo(e, A)[0].body).sort(), ['message', 'recipient']);
   assert.strictEqual(staffAlerts(e).length, 0);
@@ -450,8 +494,8 @@ test('I5 duplicates are processed once; stale and malformed events (no id, no ti
   assert.strictEqual(bad.rec.ai.length + bad.rec.sends.length, 0);
 });
 
-test('I6 voice and every attachment -> friendly text-only reply (no AI); story mention ignored; story reply, postback read as text', async () => {
-  for (const kind of ['audio', 'image', 'video', 'file', 'share', 'ig_reel', 'reel', 'ephemeral', 'unsupported']) {
+test('I6 every non-voice attachment -> friendly "text or voice" reply (no AI); story mention ignored; story reply, postback read as text', async () => {
+  for (const kind of ['image', 'video', 'file', 'share', 'ig_reel', 'reel', 'ephemeral', 'unsupported']) {
     const e = env({ seed: 308 });
     await all(e, [() => post(e, [ev(e, A, kind === 'unsupported' ? { unsupported: true } : { attach: kind })])]);
     noErrors(e);
@@ -503,7 +547,7 @@ test('I8 the 24-hour window: a reply is never sent for a message older than 24 h
   lockFree(e, IK(A)); lockFree(e, IK(B));
   // Unsupported and fallback replies are guarded too.
   const u = env({ seed: 313 });
-  await all(u, [() => postWith(u, noStale, [ev(u, A, { attach: 'audio', ts: u.sim.now - 25 * 3600000 })])]);
+  await all(u, [() => postWith(u, noStale, [ev(u, A, { attach: 'image', ts: u.sim.now - 25 * 3600000 })])]);
   assert.strictEqual(u.rec.sends.length, 0); assert.ok(ran(u, NOT_SENT('Send Unsupported Reply')));
   const f = env({ seed: 314, ai: { behave: () => ({ fail: true }) } });
   await all(f, [() => postWith(f, noStale, [ev(f, A, { text: 'x', ts: f.sim.now - 25 * 3600000 })])]);
@@ -706,5 +750,250 @@ test('IX mutations prove the checks are load-bearing: signature, account filter,
   // Dedup still drops the account's own message (second line of defense) - nothing is answered.
   assert.strictEqual(x.rec.ai.length + x.rec.sends.length, 0);
 });
+
+// ------------------------------------------------------------------ voice messages
+// All IV tests run the REAL Instagram workflow JSON in the emulator; the Meta CDN download and
+// the OpenRouter speech-to-text response are MOCKED (see AUDIO / STT above). The real provider
+// is exercised separately by tests/integration/instagram-voice-real.js.
+const voiceEv = (e, igsid, o) => {
+  const x = ev(e, igsid, Object.assign({}, o, { attach: 'audio' }));
+  x.message.attachments[0].payload.url = (o && o.url) || CDN + (SEQ++) + '&signature=abc123';
+  return x;
+};
+const stt = (e) => e.rec.stt;
+const lastIg = (e, id) => (igTo(e, id).slice(-1)[0] || {}).text || '';
+
+test('IV1 MOCKED voice path: Meta CDN only, real-format check, OpenRouter auto-detect (no fixed language), own credential, every failure -> friendly reply', () => {
+  const C = IG.connections;
+  const next = (n, i) => ((C[n] && C[n].main && C[n].main[i || 0]) || []).map((x) => x.node);
+  assert.deepStrictEqual(next('Message Type Router', 1), ['Download Voice Binary']);
+  for (const [a, b] of [['Download Voice Binary', 'Check Voice File'], ['Check Voice File', 'Transcribe Voice'], ['Transcribe Voice', 'Read Transcript'], ['Read Transcript', 'Voice Usable?'], ['Voice Usable?', 'Merge Voice Text'], ['Merge Voice Text', 'Confirmation Gate']]) assert.deepStrictEqual(next(a, 0), [b], a);
+  for (const n of ['Download Voice Binary', 'Check Voice File', 'Transcribe Voice', 'Read Transcript', 'Voice Usable?']) assert.deepStrictEqual(next(n, 1), ['24h Window Open? (Send Voice Failed Reply)'], n + ': failure -> friendly reply');
+  const dl = byNode(IG, 'Download Voice Binary');
+  assert.ok(!dl.credentials && !dl.parameters.authentication && !dl.parameters.sendHeaders, 'no token is ever sent to the media link');
+  assert.ok(dl.parameters.options.timeout <= 20000);
+  const tr = byNode(IG, 'Transcribe Voice');
+  assert.strictEqual(tr.parameters.url, 'https://openrouter.ai/api/v1/audio/transcriptions');
+  const fields = Object.fromEntries(tr.parameters.bodyParameters.parameters.map((p) => [p.name, p.value || p.inputDataFieldName]));
+  assert.deepStrictEqual(fields, { model: 'openai/whisper-large-v3', response_format: 'verbose_json', temperature: '0', file: 'data' });
+  assert.ok(!('language' in fields), 'no fixed language: the provider detects it');
+  assert.deepStrictEqual(tr.credentials, { httpHeaderAuth: ENV.credentials.transcription });
+  assert.ok(ENV.SHARED_CREDENTIALS.indexOf('transcription') < 0 && ENV.credentials.transcription.id !== ENV.credentials.cohere.id && ENV.credentials.transcription.id !== ENV.credentials.openRouter.id, 'a salon-only credential, never the clinic one');
+  for (const w of [WA, MSG]) assert.ok(!JSON.stringify(w).includes(ENV.credentials.transcription.id), 'WhatsApp / Messenger do not use it');
+  assert.ok(!JSON.stringify(IG).includes('VOICE_LANGUAGE') && !JSON.stringify(IG).includes('cohere.com'), 'no single-language Cohere settings on Instagram');
+  const gate = byNode(IG, 'Confirmation Gate').parameters.jsCode;
+  assert.ok(gate.indexOf("viaVoice = $('Merge Voice Text').isExecuted === true") >= 0, 'the gate still recognises voice');
+  // Only Meta's media CDN, over HTTPS, is accepted as a voice link.
+  const re = new RegExp(IB.MEDIA_HOST_RE, 'i');
+  for (const u of [CDN + '1&signature=x', 'https://scontent.cdninstagram.com/a.mp4', 'https://video.xx.fbcdn.net/v/a.mp4']) assert.ok(re.test(u), u);
+  for (const u of ['http://lookaside.fbsbx.com/x', 'https://evil.example/lookaside.fbsbx.com/x', 'https://fbsbx.com.evil.example/x', 'https://lookaside.example/ig/audio', 'file:///etc/passwd']) assert.ok(!re.test(u), u);
+});
+
+test('IV2 MOCKED English, French, Spanish and Arabic voice notes -> transcript (Arabic script kept) reaches the AI with the detected language; reply in text', async () => {
+  let seed = 900;
+  for (const lang of ['en', 'fr', 'es', 'ar']) {
+    const e = env({ seed: seed++ });
+    e.voice.result = STT[lang];
+    await all(e, [() => post(e, [voiceEv(e, A)])]);
+    noErrors(e);
+    assert.strictEqual(e.rec.downloads.length, 1, lang + ': downloaded once');
+    assert.strictEqual(stt(e).length, 1, lang + ': transcribed once');
+    const form = stt(e)[0].form;
+    const file = form.find((f) => f.name === 'file').file;
+    assert.strictEqual(file.fileName, 'voice.m4a'); assert.strictEqual(file.mimeType, 'audio/mp4');
+    assert.ok(file.bytes.equals(AUDIO.m4a), 'the exact downloaded audio is sent');
+    assert.ok(!form.some((f) => f.name === 'language'), 'no language forced');
+    const calls = aiFor(e, A);
+    assert.strictEqual(calls.length, 1, lang);
+    assert.strictEqual(calls[0].text, STT[lang].text, lang + ': the transcript is the customer text');
+    if (lang === 'ar') assert.ok(/[؀-ۿ]/.test(calls[0].text), 'Arabic stays in Arabic script');
+    const name = { en: 'English', fr: 'French', es: 'Spanish', ar: 'Arabic' }[lang];
+    assert.ok(calls[0].prompt.indexOf('(voice note, auto-transcribed - detected language: ' + name + '. ') >= 0, lang + ': ' + calls[0].prompt.slice(0, 300));
+    assert.ok(/Reply in text, in the detected language/.test(calls[0].prompt));
+    const out = igTo(e, A);
+    assert.ok(out.length >= 1 && out.every((s) => s.body.message.text && !s.body.message.attachment), lang + ': text replies only');
+    assert.ok(out.some((s) => s.text.indexOf(REPLY) >= 0));
+    lockFree(e, IK(A));
+  }
+  // ISO codes are accepted as well as language names.
+  const f = env({ seed: 910 });
+  f.voice.result = Object.assign({}, STT.fr, { language: 'fr' });
+  await all(f, [() => post(f, [voiceEv(f, A)])]);
+  assert.ok(aiFor(f, A)[0].prompt.indexOf('detected language: French. ') >= 0);
+});
+
+test('IV3 MOCKED automatic language detection: audio and text disagree -> UNCERTAIN; no audio language -> from the text; other languages -> please type', async () => {
+  const run1 = async (seed, result) => { const e = env({ seed }); e.voice.result = result; await all(e, [() => post(e, [voiceEv(e, A)])]); noErrors(e); return e; };
+  const mix = await run1(911, { text: 'Bonjour, je voudrais annuler mon rendez-vous de demain, merci.', language: 'english' });
+  assert.ok(/detected language: English, UNCERTAIN\. /.test(aiFor(mix, A)[0].prompt), aiFor(mix, A)[0].prompt.slice(0, 200));
+  assert.ok(/if the language is marked UNCERTAIN, reply in the language the transcript is written in, and if the transcript does not make sense, ask the customer to type/.test(aiFor(mix, A)[0].prompt));
+  const noLang = await run1(912, { text: 'أريد تغيير موعدي من فضلك' });
+  assert.ok(/detected language: Arabic, UNCERTAIN\. /.test(aiFor(noLang, A)[0].prompt));
+  for (const [seed, r] of [[913, { text: 'Guten Tag, ich möchte einen Termin buchen.', language: 'german' }], [914, { text: 'Buongiorno, vorrei prenotare un taglio.', language: 'italian' }]]) {
+    const e = await run1(seed, r);
+    assert.strictEqual(e.rec.ai.length, 0, r.language + ' is not one of the four languages');
+    assert.deepStrictEqual(igTo(e, A).map((s) => s.text), [IB.VOICE_FAILED_TEXT]);
+    lockFree(e, IK(A));
+  }
+  // A misdetected language label with a clearly supported transcript is still used (marked uncertain).
+  const mis = await run1(915, { text: '¿Tienen cita libre el sábado por la mañana?', language: 'portuguese' });
+  assert.ok(/detected language: Spanish, UNCERTAIN\. /.test(aiFor(mis, A)[0].prompt));
+});
+
+test('IV4 MOCKED response language: the server confirmation question follows the language of the voice note (Spanish, Arabic)', async () => {
+  for (const [seed, lang, said, re] of [[916, 'es', 'Quiero cancelar mi cita del martes a las 10.', /(^|\n)Para confirmar: ¿quieres cancelar tu cita “Lina - Manicure” del martes 6 de octubre a las 10:00\? Responde Sí o No\.$/],
+    [917, 'ar', 'أريد إلغاء موعدي يوم الثلاثاء الساعة العاشرة.', /(^|\n)للتأكيد: هل تريد إلغاء موعدك “Lina - Manicure” يوم الثلاثاء 6 أكتوبر الساعة 10:00؟/]]) {
+    const e = env({ seed });
+    seedIgAppt(e);
+    e.voice.result = { text: said, language: { es: 'spanish', ar: 'arabic' }[lang] };
+    e.ai.behave = aiCancels;
+    await all(e, [() => post(e, [voiceEv(e, A)])]);
+    noErrors(e);
+    assert.ok(re.test(lastIg(e, A)), lang + ': ' + lastIg(e, A));
+    assert.strictEqual(apptState(e), 'kept', 'a voice request only proposes');
+    lockFree(e, IK(A));
+  }
+});
+
+test('IV5 MOCKED download failure or a non-Meta link -> friendly reply only; nothing fetched elsewhere, nothing transcribed, nothing technical shown', async () => {
+  const e = env({ seed: 918 });
+  e.faults.voiceDownload = true;
+  await all(e, [() => post(e, [voiceEv(e, A)])]);
+  noErrors(e);
+  assert.strictEqual(stt(e).length, 0); assert.strictEqual(e.rec.ai.length, 0);
+  assert.deepStrictEqual(igTo(e, A).map((s) => s.text), [IB.VOICE_FAILED_TEXT]);
+  assert.ok(!/fbsbx|403|status|error/i.test(lastIg(e, A)));
+  lockFree(e, IK(A));
+  const x = env({ seed: 919 });
+  await all(x, [() => post(x, [voiceEv(x, A, { url: 'https://attacker.example/steal?to=fbsbx.com' })])]);
+  noErrors(x);
+  assert.ok(!x.rec.downloads.some((d) => /attacker/.test(d.url)), 'a foreign link is never requested');
+  assert.strictEqual(stt(x).length, 0);
+  assert.deepStrictEqual(igTo(x, A).map((s) => s.text), [IB.VOICE_FAILED_TEXT]);
+  lockFree(x, IK(A));
+});
+
+test('IV6 MOCKED audio formats: m4a, aac, ogg, webm, wav and mp3 are named by their real bytes; non-audio, too short and too large files -> friendly reply', async () => {
+  let seed = 920;
+  for (const [fmt, mime] of [['m4a', 'audio/mp4'], ['aac', 'audio/aac'], ['ogg', 'audio/ogg'], ['webm', 'audio/webm'], ['wav', 'audio/wav'], ['mp3', 'audio/mpeg']]) {
+    const e = env({ seed: seed++ });
+    Object.assign(e.voice, { bytes: AUDIO[fmt], mime: 'application/octet-stream' }); // the CDN content type is not trusted
+    await all(e, [() => post(e, [voiceEv(e, A)])]);
+    noErrors(e);
+    const file = stt(e)[0].form.find((f) => f.name === 'file').file;
+    assert.deepStrictEqual([file.fileName, file.mimeType], ['voice.' + fmt, mime], fmt);
+    assert.strictEqual(aiFor(e, A).length, 1, fmt);
+  }
+  for (const [name, bytes] of [['pdf', AUDIO.pdf], ['tiny', AUDIO.tiny], ['too large', padTo(AUDIO.m4a.slice(0, 32), IB.VOICE.maxBytes + 1)]]) {
+    const e = env({ seed: seed++ });
+    Object.assign(e.voice, { bytes, mime: 'audio/mp4' });
+    await all(e, [() => post(e, [voiceEv(e, A)])]);
+    noErrors(e);
+    assert.strictEqual(stt(e).length, 0, name + ': never sent for transcription');
+    assert.strictEqual(e.rec.ai.length, 0, name);
+    assert.deepStrictEqual(igTo(e, A).map((s) => s.text), [IB.VOICE_FAILED_TEXT], name);
+    lockFree(e, IK(A));
+  }
+});
+
+test('IV7 MOCKED empty or unintelligible transcription, or the provider failing -> friendly reply, no AI', async () => {
+  let seed = 930;
+  for (const result of [{ text: '', language: 'english' }, { text: ' ... ', language: 'english' }, { text: 'Thanks for watching!', language: 'english' },
+    { text: "Sous-titres réalisés par la communauté d'Amara.org", language: 'french' }, { text: 'ترجمة نانسي قنقر', language: 'arabic' },
+    { text: 'Hello hello', language: 'english', segments: [{ no_speech_prob: 0.95 }, { no_speech_prob: 0.97 }] }, {}, null]) {
+    const e = env({ seed: seed++ });
+    e.voice.result = result;
+    await all(e, [() => post(e, [voiceEv(e, A)])]);
+    noErrors(e);
+    assert.strictEqual(e.rec.ai.length, 0, JSON.stringify(result));
+    assert.deepStrictEqual(igTo(e, A).map((s) => s.text), [IB.VOICE_FAILED_TEXT], JSON.stringify(result));
+    lockFree(e, IK(A));
+  }
+  const e = env({ seed: seed++ });
+  e.faults.stt = true;
+  await all(e, [() => post(e, [voiceEv(e, A)])]);
+  noErrors(e);
+  assert.strictEqual(e.rec.ai.length, 0);
+  assert.deepStrictEqual(igTo(e, A).map((s) => s.text), [IB.VOICE_FAILED_TEXT]);
+  assert.ok(!/502|openrouter|status/i.test(lastIg(e, A)));
+  // A genuine short answer is NOT treated as silence.
+  const ok = env({ seed: seed++ });
+  ok.voice.result = { text: 'Merci beaucoup !', language: 'french' };
+  await all(ok, [() => post(ok, [voiceEv(ok, A)])]);
+  assert.strictEqual(aiFor(ok, A).length, 1);
+});
+
+test('IV8 MOCKED duplicate webhook delivery of a voice note -> downloaded, transcribed and answered once', async () => {
+  const e = env({ seed: 940 });
+  const v = voiceEv(e, A, { mid: 'ig_voice_dup_1' });
+  await all(e, [() => post(e, [v]), () => post(e, [JSON.parse(JSON.stringify(v))])]);
+  await all(e, [() => post(e, [JSON.parse(JSON.stringify(v))])]);
+  noErrors(e);
+  assert.strictEqual(e.rec.downloads.length, 1); assert.strictEqual(stt(e).length, 1); assert.strictEqual(aiFor(e, A).length, 1);
+  lockFree(e, IK(A));
+});
+
+test('IV9 MOCKED two customers send voice notes at the same moment -> each transcript stays in its own conversation', async () => {
+  const e = env({ seed: 941 });
+  e.voice.result = (req, run) => (run.accessor()('Dedup & Filter Prep').first().json.chatId === A ? STT.fr : STT.ar);
+  await all(e, [() => post(e, [voiceEv(e, A)]), () => post(e, [voiceEv(e, B)])]);
+  noErrors(e);
+  assert.strictEqual(aiFor(e, A)[0].text, STT.fr.text); assert.strictEqual(aiFor(e, B)[0].text, STT.ar.text);
+  assert.ok(/detected language: French/.test(aiFor(e, A)[0].prompt) && /detected language: Arabic/.test(aiFor(e, B)[0].prompt));
+  assert.deepStrictEqual(stt(e).map((s) => s.chat).sort(), [IK(A), IK(B)].sort());
+  assert.ok(igTo(e, A).length >= 1 && igTo(e, B).length >= 1);
+  lockFree(e, IK(A)); lockFree(e, IK(B));
+});
+
+test('IV10 MOCKED a spoken "yes" (English, Spanish, Arabic) never confirms; the customer is asked to TYPE; a typed yes then cancels', async () => {
+  let seed = 950;
+  for (const [said, lang, re] of [['Yes, please cancel it.', 'english', /(^|\n)For your security, a voice message cannot confirm this change\. Please type Yes or No\./],
+    ['Sí, cancélala.', 'spanish', /(^|\n)Por tu seguridad, una nota de voz no puede confirmar este cambio\. Escribe Sí o No\./],
+    ['نعم، ألغِ الموعد.', 'arabic', /(^|\n)لأمانك، لا يمكن لرسالة صوتية تأكيد هذا التغيير/]]) {
+    const e = env({ seed: seed++ });
+    seedIgAppt(e);
+    e.ai.behave = aiCancels;
+    await all(e, [() => post(e, [ev(e, A, { text: 'Please cancel my appointment on Tuesday at 10:00' })])]);
+    assert.ok(/(^|\n)Just to confirm: do you want to cancel/.test(lastIg(e, A)));
+    e.ai.behave = () => { throw new Error('the AI must not decide a confirmation'); };
+    e.voice.result = { text: said, language: lang };
+    await all(e, [() => post(e, [voiceEv(e, A)])]);
+    noErrors(e);
+    assert.strictEqual(apptState(e), 'kept', lang + ': a spoken yes changes nothing');
+    assert.ok(re.test(lastIg(e, A)), lang + ': ' + lastIg(e, A));
+    assert.ok(!ran(e, 'Run Confirmed Cancel'), 'no confirmed change was attempted');
+    // IV11: typed yes still follows the normal confirmation process.
+    await all(e, [() => post(e, [ev(e, A, { text: 'yes' })])]);
+    noErrors(e);
+    assert.strictEqual(apptState(e), 'cancelled', lang + ': the typed yes confirms');
+    lockFree(e, IK(A));
+  }
+});
+
+test('IV11 MOCKED the engine itself refuses a confirmation reported as voice (defence in depth)', async () => {
+  const e = env({ seed: 960 });
+  seedIgAppt(e);
+  const ident = { customer_key: IK(A), phone_number: '' };
+  const base = Object.assign(findIn(ident), { appointment_date: '2026-10-06', appointment_time: '10:00', chat_msg_id: 'm-propose' });
+  const [p] = await runAll(e, [() => callTool(e, 'cancel', base)]);
+  const m = CONF.unmark(p.result);
+  assert.ok(m && m.id, p.result);
+  const [x] = await runAll(e, [() => callTool(e, 'cancel', Object.assign({}, base, { confirm_id: m.id, confirm_message: 'yes', confirm_msg_id: 'm-yes', confirm_via: 'voice', confirm_event_id: m.ev }))]);
+  assert.ok(/^CONFIRMATION_INVALID \(not_typed\)/.test(x.result), x.result);
+  assert.strictEqual(apptState(e), 'kept');
+});
+
+function seedIgAppt(e) {
+  const s = Date.parse('2026-10-06T10:00:00+01:00');
+  e.cal.seed(CFG.CALENDAR_ID, { id: 'igappt01', summary: 'Lina - Manicure', description: 'Customer: ' + IK(A) + '. Notes: Instagram - Tel: +34600000009 | Lina', start: { dateTime: '2026-10-06T10:00:00+01:00', timeZone: 'Africa/Algiers' }, end: { dateTime: new Date(s + 30 * 60000 + 3600000).toISOString().slice(0, 19) + '+01:00', timeZone: 'Africa/Algiers' } });
+}
+const apptState = (e) => (e.cal.store(CFG.CALENDAR_ID).get('igappt01').cur.status === 'cancelled' ? 'cancelled' : 'kept');
+const aiCancels = (c, run) => ({ output: 'OK', tools: async (env2) => {
+  const r = await callTool(env2, 'cancel', Object.assign(findIn(toolIdent(run, 'Cancel_Appointment')), { appointment_date: '2026-10-06', appointment_time: '10:00', chat_msg_id: run.accessor()('Dedup & Filter Prep').first().json.messageId }));
+  return [{ action: { tool: 'Cancel_Appointment' }, observation: r.result }];
+} });
+
+// Reused by tests/integration/instagram-voice-real.js (real audio / real provider).
+module.exports = { env, post, voiceEv, all, aiFor, igTo, lockFree, noErrors, ran, IG, IB, A, B, IK, CDN, STT };
 
 if (require.main === module) runTests('instagram').then((r) => process.exit(r.fail ? 1 : 0));

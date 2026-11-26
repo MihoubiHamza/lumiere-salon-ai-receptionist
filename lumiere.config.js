@@ -49,6 +49,10 @@ module.exports = {
     // linked to the salon's Instagram professional account) with instagram_manage_messages.
     // Its own credential so it can be rotated / revoked without touching Messenger.
     instagram: { id: 'lumIgPageToken01', name: 'LUMIERE - Instagram Page Token' },
+    // Instagram voice notes: OpenRouter speech-to-text (automatic language detection).
+    // Header Auth, name "Authorization", value "Bearer <a salon-only OpenRouter key with a
+    // spending limit>". Never shared with the other bots.
+    transcription: { id: 'lumOrTranscribe1', name: 'LUMIERE - OpenRouter Transcription' },
   },
   // Account-level credentials deliberately SHARED with the older bots on the instance
   // (decided 2026-11-24: the older bot bot is being retired). Sharing them is safe
