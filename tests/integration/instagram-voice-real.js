@@ -71,29 +71,27 @@ async function realStt(req) {
 }
 
 async function runOne(label, bytes, expectLang, mode) {
-  const e = env({ seed: 7000 + Math.floor(Math.random() * 1000) });
+  const seed = 7000 + Math.floor(Math.random() * 1000);
+  let e = env({ seed });
   Object.assign(e.voice, { bytes, mime: 'audio/mp4' });
   let real = null;
   if (mode === 'real') {
-    e.voice.result = () => { throw new Error('placeholder'); };
-    const R = require(path.join(ROOT, 'tests', 'lib', 'runner.js'));
-    // Intercept the transcription request: forward it to the real provider.
-    const orig = R.Runner.prototype.http;
-    R.Runner.prototype.http = async function (node, items, runIndex) {
-      if (node.name !== 'Transcribe Voice') return orig.call(this, node, items, runIndex);
-      const hook = this.env.hooks.http;
-      this.env.hooks.http = async (req, run) => {
-        if (req.url !== IB.VOICE.url) return hook(req, run);
-        const t0 = Date.now();
-        real = await realStt(req);
-        real.ms = Date.now() - t0;
-        real.sent = req.form.find((f) => f.file).file;
-        if (real.status >= 400) throw new Error('Request failed with status code ' + real.status);
-        return { statusCode: 200, body: real.body };
-      };
-      try { return await orig.call(this, node, items, runIndex); } finally { this.env.hooks.http = hook; }
-    };
-    try { await all(e, [() => post(e, [voiceEv(e, A)])]); } finally { R.Runner.prototype.http = orig; }
+    // The emulator runs on a SIMULATED clock, which cannot wait for a real network call.
+    // 1) run the workflow once to capture the exact multipart request it builds;
+    // 2) send that request to the real provider (outside the simulation);
+    // 3) run the workflow again with the provider's real response.
+    e.voice.result = { text: 'capture run', language: 'english' };
+    await all(e, [() => post(e, [voiceEv(e, A)])]);
+    const captured = e.rec.stt[0];
+    if (!captured) throw new Error(label + ': the workflow did not build a transcription request');
+    const t0 = Date.now();
+    real = await realStt({ url: IB.VOICE.url, form: captured.form });
+    real.ms = Date.now() - t0;
+    real.sent = captured.form.find((f) => f.file).file;
+    e = env({ seed });
+    Object.assign(e.voice, { bytes, mime: 'audio/mp4', result: real.body });
+    if (real.status >= 400) e.faults.stt = true;
+    await all(e, [() => post(e, [voiceEv(e, A)])]);
   } else {
     e.voice.result = { text: 'Mocked transcript.', language: 'english' };
     await all(e, [() => post(e, [voiceEv(e, A)])]);
@@ -133,7 +131,13 @@ async function runOne(label, bytes, expectLang, mode) {
     console.log('\nPart B - REAL PROVIDER (OpenRouter text-to-speech + speech-to-text ' + IB.VOICE.model + ')');
     const real = { 'en-sapi.m4a': ['en', files['en-sapi.m4a']] };
     for (const lang of ['en', 'fr', 'es', 'ar']) {
-      const wav = await tts(lang);
+      let wav;
+      try { wav = await tts(lang); } catch (err) {
+        // Speech generation refused (e.g. account credits): report it, keep testing speech-to-text with the other files.
+        console.log('  SKIPPED ' + lang + ' text-to-speech sample: ' + String(err.message).slice(0, 160));
+        results.push({ label: lang + '-tts', mode: 'real', skipped: 'text-to-speech unavailable' });
+        continue;
+      }
       const wavPath = path.join(OUT, lang + '-tts.wav');
       fs.writeFileSync(wavPath, wav);
       real[lang + '-tts.wav'] = [lang, wav];
@@ -153,6 +157,7 @@ async function runOne(label, bytes, expectLang, mode) {
   for (const r of results) console.log(JSON.stringify(r));
   const cost = results.reduce((a, r) => a + (Number(r.cost) || 0), 0);
   if (KEY) console.log('\nreported speech-to-text cost for this run: $' + cost.toFixed(6));
-  console.log(failures ? failures + ' check(s) FAILED' : 'ALL CHECKS PASSED');
-  process.exit(failures ? 1 : 0);
-})().catch((err) => { console.error('integration test error: ' + String(err && err.message || err).replace(/Bearer\s+\S+/g, 'Bearer <hidden>')); process.exit(1); });
+  const skipped = results.filter((r) => r.skipped).length;
+  console.log(failures ? failures + ' check(s) FAILED' : 'ALL CHECKS PASSED' + (skipped ? ' (' + skipped + ' sample(s) skipped)' : ''));
+  process.exitCode = failures ? 1 : 0;
+})().catch((err) => { console.error('integration test error: ' + String(err && err.message || err).replace(/Bearer\s+\S+/g, 'Bearer <hidden>')); process.exitCode = 1; });
