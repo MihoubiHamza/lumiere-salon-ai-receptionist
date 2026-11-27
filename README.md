@@ -1,7 +1,7 @@
 # Lumière Hair & Beauty Studio — AI Receptionist (demo)
 
 Yasmine, the AI receptionist, set up for **Lumière Hair & Beauty Studio**, a fictional, modern hair and beauty salon.
-She answers customers on **WhatsApp**, **Facebook Messenger**, **Instagram Direct** (text and voice messages in), replies in text and the **website chat**, explains services, prices and durations, and books, reschedules and cancels appointments in Google Calendar. She speaks **English, French, Spanish and Arabic**.
+She answers customers on **WhatsApp**, **Facebook Messenger**, **Instagram Direct** (text and voice messages; replies are text) and the **website chat**, explains services, prices and durations, and books, reschedules and cancels appointments in Google Calendar. She speaks **English, French, Spanish and Arabic**.
 
 All salon data (address, phone, prices, durations, policies, opening hours) is **fictional demo data**.
 
