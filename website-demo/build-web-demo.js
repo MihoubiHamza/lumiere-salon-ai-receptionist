@@ -28,7 +28,7 @@ const NAME = 'Lumière Salon - Website Demo';
 const FILE_BASE = 'Lumiere Salon - Website Demo';
 const ENV = require(path.join(ROOT, 'lumiere.config.js')).websiteDemo;
 // Fixed ids from lumiere.config.js (websiteDemo.workflows). None of them exists in
-// the clinic projects (the clinic website demo uses othWebDemo...), so importing
+// the other projects on the same n8n instance, so importing
 // these files creates new workflows and can never replace the clinic website demo.
 // The tool nodes link to them.
 const WF = {
@@ -850,8 +850,8 @@ function finish(wf, key) {
 // that must never appear in the demo files.
 function realFingerprints() {
   const ids = new Set();
-  const realDirs = [ROOT, path.resolve(ROOT, '..', 'other-bot-backup'), path.resolve(ROOT, '..', 'other-bot-messenger'),
-    path.resolve(ROOT, '..', 'other-bot-messenger', 'website-demo'), path.resolve(ROOT, '..', 'other-bot-whatsapp')];
+  const FP = require(path.join(ROOT, 'tests', 'lib', 'clinic-fingerprints.js'));
+  const realDirs = [ROOT].concat(FP.CLINIC_DIRS.map((d) => path.resolve(ROOT, '..', d)));
   for (const dir of realDirs) {
     if (!fs.existsSync(dir)) continue;
     for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json'))) {
@@ -866,11 +866,12 @@ function realFingerprints() {
   }
   return ids;
 }
-const FORBIDDEN = [/213777744607/, /gmail\.com/i, /(?<!hamza)mihoubi/i, /ميهوبي/,
-  /lumierelock/, /\$env\.CLINIC_/, /whatsAppTrigger|whatsAppApi|n8n-nodes-base\.whatsApp/,
+// Generic rules; the other clients' names, numbers and ids come from the git-ignored
+// tests/lib/clinic-fingerprints.local.json (FP.PATTERNS), so they never reach the public repo.
+const FORBIDDEN = [/213777744607/, /gmail\.com/i, /(?<!hamza)mihoubi/i, /ميهوبي/, /lumierelock/, /\$env\.CLINIC_/, /whatsAppTrigger|whatsAppApi|n8n-nodes-base\.whatsApp/,
   /darija/i, /الدارجة/, /cabinet/i, /\bclinic\b/i,
-  // the clinic website demo's workflow ids, webhook path, calendar and credentials
-  /graph\.facebook\.com/, /\bcohere\b/i, /Active_Handoffs|ConversationLog/, /googleSheets/i];
+  /graph\.facebook\.com/, /\bcohere\b/i, /Active_Handoffs|ConversationLog/, /googleSheets/i]
+  .concat(require(path.join(ROOT, 'tests', 'lib', 'clinic-fingerprints.js')).PATTERNS);
 // Account-level credentials shared with the older website demo on purpose (lumiere.config.js
 // websiteDemo.SHARED_CREDENTIALS); every other id above stays forbidden.
 function sharedIds() {

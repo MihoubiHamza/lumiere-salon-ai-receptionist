@@ -1,26 +1,38 @@
 'use strict';
-// Identifiers of the CLINIC bots that must never appear in the Lumière files.
-// 1. A fixed list (so the isolation tests work even on a machine without the
-//    clinic folders), and 2. everything found by scanning the clinic folders
-//    next to this project, when they exist (read-only).
+// Identifiers of the OTHER bots on the same n8n instance, which must never appear
+// in the Lumière files.
+// The real values (calendars, sheet, credential/workflow ids, webhook paths, lock ids,
+// phone numbers, folder names, name patterns) belong to another client. They live in
+// the git-ignored clinic-fingerprints.local.json next to this file, never in the repo.
+// Without that file the checks still run: on the generic rules, on the salon's own
+// resources and on everything found by scanning the folders it lists (read-only).
 const fs = require('fs');
 const path = require('path');
 
+const LOCAL = (() => {
+  try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'clinic-fingerprints.local.json'), 'utf8')); } catch (e) { return {}; }
+})();
+const S = LOCAL.static || {};
+
 const STATIC = {
-  calendars: ['other-bot-calendar-1@group.calendar.google.com', 'other-bot-calendar-2@group.calendar.google.com'],
-  sheets: ['OTHER_BOT_SHEET_ID'],
-  credentials: ['rZX0lgyJh37EPtO6', '8cDyURx4XMYQvDrW', 'otherWf000000014', 'otherWf000000015', '3JRN7dwrwfWdcPVS', '2KXHYFXQUgXkYyRh', 'messengerPageToken', 'hDz7EcZEdPypZGV4', '1LzpxYC9KJuRY5cL'],
-  workflows: ['otherWf000000001', 'otherWf000000002', 'otherWf000000003', 'otherWf000000004', 'otherWf000000005', 'otherWf000000006', 'otherWf000000013',
-    'othWebDemoMain01', 'othWebDemoBook01', 'othWebDemoCanc01', 'othWebDemoResc01', 'othWebDemoFind01', 'othWebDemoChck01'],
-  webhookPaths: ['other-bot-messenger', 'other-website-demo'],
-  // phone numbers of the clinic and of the seller's own WhatsApp (never a salon notification target)
-  numbers: ['213500000999', '0500000999', '213777744607'],
-  lockPrefixes: ['otherbotlock', 'otherbotlockb', 'othdemolockcal01', 'othdemolockchat'],
+  calendars: S.calendars || [],
+  sheets: S.sheets || [],
+  credentials: ['messengerPageToken'].concat(S.credentials || []),
+  workflows: S.workflows || [],
+  // every workflow id of the other projects (tests: no Lumière id may collide with one)
+  otherWorkflowIds: LOCAL.otherWorkflowIds || S.workflows || [],
+  webhookPaths: S.webhookPaths || [],
+  // the seller's own WhatsApp (never a salon notification target) and the other clients' numbers
+  numbers: ['213777744607'].concat(S.numbers || []),
+  lockPrefixes: LOCAL.lockPrefixes || [],
+  lockIds: LOCAL.lockIds || [],
   envPrefix: 'CLINIC_',
+  local: !!LOCAL.static,
 };
 
-const CLINIC_DIRS = ['other-bot-whatsapp', 'other-bot-messenger', path.join('other-bot-messenger', 'website-demo'),
-  'other-bot-backup', 'other-bot-template'];
+const CLINIC_DIRS = LOCAL.dirs || [];
+// Extra "must never appear" patterns for the website demo build: names, addresses, numbers.
+const PATTERNS = (LOCAL.patterns || []).map(([src, flags]) => new RegExp(src, flags));
 
 function jsonFiles(dir) { try { return fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => path.join(dir, f)); } catch (e) { return []; } }
 
@@ -75,6 +87,6 @@ function lockIdsIn(text) {
   for (const m of text.matchAll(/\\?"(?:CAL_LOCK_ID|CHAT_LOCK_PREFIX)\\?": \\?"([a-v0-9]+)\\?"/g)) out.add(m[1]);
   return out;
 }
-const isClinicLock = (id) => /^(otherbotlock|otherbotlockb)/.test(id) || id === 'othdemolockcal01' || id === 'othdemolockchat';
+const isClinicLock = (id) => STATIC.lockPrefixes.some((p) => id.startsWith(p)) || STATIC.lockIds.includes(id);
 
-module.exports = { STATIC, CLINIC_DIRS, SHAREABLE, sharedCredentials, collect, lockIdsIn, isClinicLock };
+module.exports = { STATIC, CLINIC_DIRS, PATTERNS, SHAREABLE, sharedCredentials, collect, lockIdsIn, isClinicLock };

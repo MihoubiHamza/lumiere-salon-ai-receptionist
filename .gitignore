@@ -23,3 +23,6 @@ desktop.ini
 
 # Generated launch-video output (large media, contains a browser profile)
 brag-output/
+
+# Identifiers of other clients on the same n8n instance (used by the isolation checks)
+tests/lib/clinic-fingerprints.local.json

@@ -12,6 +12,7 @@ const { Sim } = require(path.join(LIB, 'sim.js'));
 const { FakeCalendar } = require(path.join(LIB, 'fake-calendar.js'));
 const { test, runTests } = require(path.join(LIB, 't.js'));
 const BUILD = require('../build-web-demo.js');
+const FP = require(path.join(LIB, 'clinic-fingerprints.js'));
 const DEMO = require('../demo-config.js');
 const WB = require('../../tools/build-workflows.js');
 // The website demo may only use its own credentials (lumiere.config.js websiteDemo.credentials).
@@ -171,9 +172,8 @@ const bookArgs = (date, start, end, summary, service) => ({ start_datetime: date
 
 // ================================================================= static
 test('S1 six workflows: names, fixed demo ids, inactive, no execution data saved', () => {
-  const realIds = ['otherWf000000001', 'otherWf000000002', 'otherWf000000003', 'otherWf000000004', 'otherWf000000005', 'otherWf000000006', 'otherWf000000007', 'otherWf000000008', 'otherWf000000009', 'otherWf000000010', 'otherWf000000011', 'otherWf000000012', 'otherWf000000013',
-    'othWebDemoMain01', 'othWebDemoBook01', 'othWebDemoCanc01', 'othWebDemoResc01', 'othWebDemoFind01', 'othWebDemoChck01',
-    'lumWhatsAppMain1', 'lumBookAppoint01', 'lumCancelAppt001', 'lumReschedAppt01', 'lumFindAppts0001', 'lumCheckAvail001', 'lumMessengerMain'];
+  const realIds = FP.STATIC.otherWorkflowIds.concat([
+    'lumWhatsAppMain1', 'lumBookAppoint01', 'lumCancelAppt001', 'lumReschedAppt01', 'lumFindAppts0001', 'lumCheckAvail001', 'lumMessengerMain']);
   for (const k of Object.keys(BUILD.WF)) {
     const wf = JSON.parse(raw[k]);
     assert.strictEqual(wf.name, BUILD.WF[k].name);
@@ -223,7 +223,7 @@ test('S2 graph: every connection, $() reference and tool link resolves; Code nod
   const hook = main.nodes.find((n) => n.name === 'Website Webhook');
   assert.strictEqual(hook.parameters.httpMethod, 'POST');
   assert.strictEqual(hook.parameters.path, BUILD.WEBHOOK_PATH, 'webhook path from lumiere.config.js');
-  assert.notStrictEqual(hook.parameters.path, 'other-website-demo', 'must not share the clinic website demo webhook');
+  for (const p of FP.STATIC.webhookPaths) assert.notStrictEqual(hook.parameters.path, p, 'must not share another website demo webhook');
   assert.strictEqual(hook.parameters.responseMode, 'responseNode');
   assert.strictEqual(hook.parameters.options.allowedOrigins, ORIGIN);
   for (const gone of ['WhatsApp Trigger', 'Send WhatsApp Reply', 'Escalate to Staff', 'Log Conversation', 'Get Clinic Info', 'Cohere Transcribe']) assert.ok(!main.nodes.some((n) => n.name === gone), gone + ' removed');

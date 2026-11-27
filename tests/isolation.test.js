@@ -34,7 +34,7 @@ test('I1 no clinic resource ID, calendar, sheet, lock prefix or notification num
   console.log('       (clinic folders scanned read-only: ' + (CLINIC.scannedDirs.length ? CLINIC.scannedDirs.map((d) => path.basename(d)).join(', ') : 'none found - fixed list only') + ')');
   const needles = [...CLINIC.ids, ...CLINIC.calendars, ...CLINIC.sheets, ...CLINIC.webhookIds].filter((x) => String(x).length >= 8 && !SHARED_IDS.has(x));
   for (const x of ALL.concat(CONFIG_TEXTS)) for (const n of needles) assert.ok(x.text.indexOf(n) < 0, x.file + ' reuses clinic identifier ' + n);
-  // Lock objects: exact ids (the clinic used otherbotlock*/otherbotlockb*/othdemolock*).
+  // Lock objects: exact ids and prefixes of the other bots (from the local fingerprint file).
   let locks = 0;
   for (const x of ALL) for (const id of FP.lockIdsIn(x.text)) { locks++; assert.ok(!FP.isClinicLock(id), x.file + ' uses the clinic lock id ' + id); }
   assert.ok(locks >= 10, 'lock ids were checked (' + locks + ')');
