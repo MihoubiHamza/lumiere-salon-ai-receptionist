@@ -1,7 +1,7 @@
 # Lumière Hair & Beauty Studio — AI Receptionist (demo)
 
 Yasmine, the AI receptionist, set up for **Lumière Hair & Beauty Studio**, a fictional, modern hair and beauty salon.
-She answers customers on **WhatsApp**, **Facebook Messenger**, **Instagram Direct** (text only) and the **website chat**, explains services, prices and durations, and books, reschedules and cancels appointments in Google Calendar. She speaks **English, French, Spanish and Arabic**.
+She answers customers on **WhatsApp**, **Facebook Messenger**, **Instagram Direct** (text and voice messages in), replies in text and the **website chat**, explains services, prices and durations, and books, reschedules and cancels appointments in Google Calendar. She speaks **English, French, Spanish and Arabic**.
 
 All salon data (address, phone, prices, durations, policies, opening hours) is **fictional demo data**.
 
@@ -85,16 +85,15 @@ One thing the files cannot enforce: the salon needs its **own Meta app and Whats
 
 ## Known limits (honest list)
 
-- **Instagram is text only and not tested against Meta yet:**
-  - voice messages and attachments get a friendly "please type" reply;
+- **Instagram is not tested against Meta yet:**
+  - voice messages are transcribed by OpenRouter Whisper (language detected automatically); the real Instagram audio format and the provider call are not verified live yet; photos and other attachments get a friendly "text or voice" reply;
   - replies are only sent inside Meta's 24-hour window, and staff must answer handed-off customers within 24 h (the HUMAN_AGENT tag is not used);
   - real customers need Advanced Access (App Review + Business Verification);
   - see `INSTAGRAM-SETUP.md`.
 - **Messenger bookings made before the customer-key update** (`Phone: <Messenger ID>`, test data only) are no longer linked to a conversation; staff handle them by hand.
 - **One shared calendar:** each time slot holds one appointment. There is no per-stylist availability; a stylist preference is only written in the booking notes.
-- **Voice notes are supported in ONE language only:** Cohere's transcription API needs the language up front and has no automatic detection, so every voice note is transcribed in `VOICE_LANGUAGE` (Spanish by default). The AI is told this and asks customers who use another language to type. Text messages work in all four languages. No voice language has been verified with live audio yet. Multi-language voice would need a different transcription service; the disabled `Groq HTTP Request (fallback, disabled)` node (Whisper) is an option, but it is not wired or tested.
+- **WhatsApp and Messenger voice notes are supported in ONE language only:** Cohere's transcription API needs the language up front and has no automatic detection, so every voice note is transcribed in `VOICE_LANGUAGE` (Spanish by default). The AI is told this and asks customers who use another language to type. Text messages work in all four languages. No voice language has been verified with live audio yet. Instagram uses OpenRouter Whisper with automatic language detection instead (`INSTAGRAM-SETUP.md`); WhatsApp and Messenger are not switched over.
 - **Messenger voice clips** are MP4/AAC, which Cohere's documentation does not list as a supported format.
-- **Changing to a service with a different length** is done as cancel + new booking (Reschedule keeps the original length). The prompt explains this to the AI; it is not a single atomic operation.
 - **Timezone:** the engine uses a fixed UTC offset (UTC+1, `Africa/Algiers`, no daylight saving time). A salon in a DST timezone (e.g. Europe/Madrid) needs engine work first.
 - **Phone numbers** written without a country code are read as Algerian (+213) numbers, inherited from the original deployment. WhatsApp and Messenger IDs are unaffected; only a "booked from another number" lookup typed without a country code is.
 - **Internal names kept on purpose** (never shown to customers): tool names `Find_Patient_Appointments` and `Get_Clinic_Info`, input `patient_name`, sheet columns `Patient_ID` / `PatientMessage`. Renaming them would break n8n links, the sheet layout or the sub-workflow contracts.
