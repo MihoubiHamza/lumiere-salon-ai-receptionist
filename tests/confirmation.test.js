@@ -76,6 +76,25 @@ test('K3 explicit confirmation (EN, FR, ES, AR) applies exactly the confirmed ch
   assert.strictEqual(Date.parse(ev.end.dateTime) - Date.parse(ev.start.dateTime), 45 * 60000, 'same length');
 });
 
+test('K3b French elided answers: "oui, c\'est d\'accord", "c\'est ça", "ça marche" confirm; "ce n\'est pas la peine" refuses; look-alike requests never confirm', async () => {
+  const want = {
+    yes: ["Oui, c'est d'accord.", 'oui c’est d’accord', "C'est d'accord", "Oui c'est ça", "c'est parfait, merci", 'Ça marche', 'ça me va', "oui c'est bon", "d'accord", 'Oui, je confirme'],
+    no: ["Non, ce n'est pas la peine", 'Non, pas question', "c'est non", 'non merci'],
+    other: ["C'est d'accord pour 15h ?", "c'est pour quand mon rendez-vous ?", "c'est combien une coupe ?", 'oui mais plutôt jeudi', "c'est d'accord mais pas demain"],
+  };
+  for (const kind of Object.keys(want)) for (const m of want[kind]) assert.strictEqual(CONF.classify(m), kind, JSON.stringify(m));
+  // End to end through the execution workflow (found by the local voice test: this yes used to be "other").
+  let seed = 530;
+  for (const [msg, ok] of [["Oui, c'est d'accord.", true], ['Ça marche', true], ["Non, ce n'est pas la peine", false], ["C'est d'accord pour 15h ?", false]]) {
+    const env = makeEnv({ seed: seed++ });
+    seedAppt(env, 'apptone1', A, DAY, '10:00', 'Sara - Manicure');
+    const m = await propose(env, 'cancel', cn(A, '10:00'));
+    const r = await execute(env, 'cancel', cn(A, '10:00'), m, { confirm_message: msg });
+    if (ok) { assert.ok(/^SUCCESS/.test(r.result), msg + ': ' + r.result); assert.strictEqual(apptTime(env, 'apptone1'), 'cancelled'); }
+    else { assert.strictEqual(reasonOf(r), 'not_yes', msg + ': ' + r.result); assert.strictEqual(apptTime(env, 'apptone1'), DAY + 'T10:00'); }
+  }
+});
+
 test('K4 negative and ambiguous answers never apply the change (checked again inside the execution workflow)', async () => {
   for (const [i, msg] of ['no', 'non merci', 'maybe', 'hmm', '👍', 'yes no', 'yes but at 16:00', 'what are your prices?'].entries()) {
     const env = makeEnv({ seed: 520 + i });

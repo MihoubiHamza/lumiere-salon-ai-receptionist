@@ -1,5 +1,18 @@
 # CHANGELOG — Lumière Hair & Beauty Studio AI Receptionist
 
+## Confirmation classifier: French answers with "c'est" (2026-11-27)
+
+Found by a local, offline voice test: the shared confirmation classifier read "Oui, c'est d'accord." as `other` (a new request), because the elision splits into the unknown words "c" and "est". The pending confirmation was then dropped, so a French customer had to ask again. It was safe (nothing was changed), but awkward. This affected every channel, typed or spoken.
+
+- **Fix** (`engine/confirm.js`): whole French expressions are matched before the existing `d accord` rule.
+  - **Yes:** "c'est d'accord", "c'est ça", "c'est parfait", "c'est bon", "c'est correct", "ça marche", "ça me va"…
+  - **No:** "ce n'est pas la peine", "c'est non", "pas question", "surtout pas".
+  - **Unchanged:** messages with extra words or a time ("C'est d'accord pour 15h ?", "c'est combien ?") stay `other`. They are never read as a yes.
+- **Regression check:** on a 66-phrase set in four languages, only the 4 intended French phrases changed. The language detector changed for "ça marche" only, which is now French instead of unknown.
+- **Voice:** a spoken "Oui, c'est d'accord." is now recognised as a yes and refused as spoken ("Écrivez Oui ou Non"), keeping the pending confirmation, so a typed "oui" then confirms.
+- **Rebuilt:** all workflows that embed the classifier (WhatsApp + tools, Messenger, Instagram, website demo). Nothing is deployed.
+- **Tests:** `tests/confirmation.test.js` K3b. `npm test`: 16 suites, 291 tests.
+
 ## Instagram: multilingual voice messages (2026-11-26)
 
 Instagram moves from text-only to text **and voice** input in English, French, Spanish and Arabic, with the language detected automatically. Replies stay text-only. Nothing was imported or published; the Instagram workflow stays inactive.

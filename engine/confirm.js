@@ -30,6 +30,10 @@ function createConfirm() {
   const PHRASES = [
     // multi-word expressions, mapped to a single token before matching
     [/\b(go ahead|of course|that s right|thats right|sounds good|yes please|do it|please do)\b/g, ' yes '],
+    // French elisions ("c'est", "d'accord" become "c est", "d accord"): whole expressions first,
+    // so "oui, c'est d'accord" is a yes and not "oui c est oui" with two unknown words.
+    [/\b(ce n est pas la peine|c est non|pas question|surtout pas)\b/g, ' non '],
+    [/\b(c est d accord|c est ok|c est okay|c est bon|c est parfait|c est correct|c est juste|c est exact|c est ca|c est cela|c est confirme|ca marche|ca me va|ca roule|ca me convient)\b/g, ' oui '],
     [/\b(d accord|c est bon|cest bon|bien sur|allez y|vas y|tout a fait)\b/g, ' oui '],
     [/\b(de acuerdo|por supuesto|desde luego|esta bien|adelante|claro que si)\b/g, ' si '],
     [/\b(no thanks|no thank you|not now|dont do it|do not|don t|no need)\b/g, ' no '],
