@@ -15,7 +15,7 @@ It is generated from the Lumière WhatsApp workflows in the project root. It has
 | `PHOTO-CREDITS.md` | The five Unsplash photos used on the site, with photographers and licence check |
 | `tests/site.test.js` | Website tests: menu = salon-info.js, webhook, no fake claims, photo credits, four languages complete |
 
-All 6 workflows import **inactive**, with their own fixed IDs (`lumWebDemo…`), webhook path (`lumiere-website-demo`), calendar, credentials and lock objects, all set in `../lumiere.config.js` (`websiteDemo`). Importing them creates **new** workflows: the other website demo (`othWebDemo…`, `other-website-demo`) is never replaced and both can run side by side. The tool links already point to the right workflows.
+All 6 workflows import **inactive**, with their own fixed IDs (`lumWebDemo…`), webhook path (`lumiere-website-demo`), calendar, credentials and lock objects, all set in `../lumiere.config.js` (`websiteDemo`). Importing them creates **new** workflows: another website demo on the same instance is never replaced and both can run side by side. The tool links already point to the right workflows.
 
 ## Setup
 

@@ -38,8 +38,9 @@ When the test count changes, update it in `README.md` and `SETUP.md` (checklist 
 ## Safety rules (do not weaken)
 
 - **Isolation from other bots.** The same n8n instance runs another client's bots.
-  - Never touch clinic workflows, their published state, credentials, calendars or webhooks.
-  - `tests/isolation.test.js` and preflight scan the clinic folders next to this repo read-only.
+  - Never touch their workflows, published state, credentials, calendars or webhooks.
+  - `tests/isolation.test.js` and preflight scan their folders next to this repo read-only.
+  - Their identifiers, folder names and name patterns live only in the git-ignored `tests/lib/clinic-fingerprints.local.json`. Never commit them or copy them into a tracked file. The repo is public.
   - Salon resources use the `lum…` / `lumWebDemo…` IDs, `LUMIERE - …` credentials and `LUMIERE_*` env vars.
   - WhatsApp, Messenger and Instagram credentials can never be shared.
 - **Customer keys** are channel-aware: `wa:<number>`, `fb:<page>:<psid>`, `ig:<account>:<igsid>`. Locks, pending confirmations, memory and ownership are keyed by them.

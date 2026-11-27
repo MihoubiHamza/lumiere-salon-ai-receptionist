@@ -55,7 +55,7 @@ module.exports = {
     transcription: { id: 'lumOrTranscribe1', name: 'LUMIERE - OpenRouter Transcription' },
   },
   // Account-level credentials deliberately SHARED with the older bots on the instance
-  // (decided 2026-11-24: the older bot bot is being retired). Sharing them is safe
+  // (decided 2026-11-24: the older bot is being retired). Sharing them is safe
   // because the salon still uses its own calendars, sheet, IDs and lock objects.
   // Only googleCalendar, googleSheets, openRouter and cohere may be listed here:
   // WhatsApp, the WhatsApp trigger, the Facebook Page token and the Instagram token

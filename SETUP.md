@@ -12,9 +12,9 @@ Nothing in this project contacts Google, Meta or n8n. You do every step below yo
 | Google Sheet | their sheet | `google.SHEET_ID`, tabs by name | `lumiere.config.js` |
 | n8n credentials | their credentials | own `LUMIERE - …` WhatsApp/Messenger credentials; Google, OpenRouter and Cohere shared on purpose (`SHARED_CREDENTIALS`) | `lumiere.config.js` |
 | WhatsApp number, token, staff number | `CLINIC_*` env vars | `LUMIERE_*` env vars | n8n environment (`lumiere.env.example`) |
-| Workflow IDs | clinic IDs, `othWebDemo…` | `lum…`, `lumWebDemo…` | `lumiere.config.js` |
-| Webhook paths | `other-bot-messenger`, `other-website-demo` | `lumiere-messenger`, `lumiere-instagram`, `lumiere-website-demo` | `lumiere.config.js` |
-| Calendar lock objects | `otherbotlock…`, `othdemolock…` | `lumierelock…`, `lumdemolock…` | engine config (generated) |
+| Workflow IDs | their IDs | `lum…`, `lumWebDemo…` | `lumiere.config.js` |
+| Webhook paths | their paths | `lumiere-messenger`, `lumiere-instagram`, `lumiere-website-demo` | `lumiere.config.js` |
+| Calendar lock objects | their lock ids | `lumierelock…`, `lumdemolock…` | engine config (generated) |
 | Timezone | — | `TIMEZONE` (fixed offset only; the build refuses DST zones) | `lumiere.config.js` |
 
 `tests/isolation.test.js` (10 tests) and `tools/preflight.js` fail if any Lumière file contains another bot's ID, calendar, sheet, credential (except the account-level ones listed in `SHARED_CREDENTIALS`), webhook, lock ID, `CLINIC_*` variable or notification number. They read the other bots' folders next to this project **read-only**. Those bots' identifiers and folder names come from the git-ignored `tests/lib/clinic-fingerprints.local.json`; without it, the checks run on the generic rules and the salon's own resources.
@@ -87,7 +87,7 @@ Instagram Direct (optional): in the same salon app (verify first that it is not 
 
 ## Step 5 — n8n credentials
 
-**Current setup (2026-11-24): account-level credentials are shared.** The older bot bot is being retired, so the salon reuses the existing Google, OpenRouter and Cohere credentials (`SHARED_CREDENTIALS` in `lumiere.config.js`). This is safe because the salon still has its own calendars, sheet, workflow IDs and lock objects. WhatsApp and Messenger can **never** be shared: the build, tests and preflight refuse it.
+**Current setup (2026-11-24): account-level credentials are shared.** The older bot is being retired, so the salon reuses the existing Google, OpenRouter and Cohere credentials (`SHARED_CREDENTIALS` in `lumiere.config.js`). This is safe because the salon still has its own calendars, sheet, workflow IDs and lock objects. WhatsApp and Messenger can **never** be shared: the build, tests and preflight refuse it.
 
 | Credential (exact id + name in `lumiere.config.js`) | n8n type | What to enter | Used by |
 |---|---|---|---|

@@ -431,7 +431,7 @@ Messenger and the website demo.
 - **Google:** created the test calendars "Lumière Salon (TEST)" and "Lumière Demo"
   (Africa/Algiers) and the sheet "Lumière Salon - Bot data (TEST)". Their IDs
   are in `lumiere.config.js`; no placeholder is left.
-- **Shared credentials (owner's decision; the older bot bot is being retired):**
+- **Shared credentials (owner's decision; the older bot is being retired):**
   the salon uses the existing `Google Calendar account`, `Google Sheets account`,
   `OpenRouter account`, `Header Auth account` (Cohere), `DEMO - Google Calendar`
   and `DEMO - OpenRouter`. They are listed in the new `SHARED_CREDENTIALS`.
